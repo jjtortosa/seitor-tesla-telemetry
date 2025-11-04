@@ -115,4 +115,10 @@ Built by [@seitor](https://github.com/seitor) for personal use at ha.seitor.com
 
 ---
 
-**Status**: 🚧 In development - Documentation in progress
+**Status**: ✅ v0.1.0 - Core implementation complete
+
+- ✅ Documentation (6 guides, ~20k words)
+- ✅ Server infrastructure (Docker Compose stack)
+- ✅ Home Assistant integration (full custom component)
+- ⏳ Protobuf schema (placeholder, needs compilation)
+- ⏳ Real-world testing pending
