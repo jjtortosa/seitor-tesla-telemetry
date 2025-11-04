@@ -1,0 +1,98 @@
+# Secrets and Keys
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+private_key.*
+public_key.*
+*.secret
+
+# Certificates
+server/certs/
+server/letsencrypt/
+*.cert
+
+# Environment and Config
+.env
+.env.local
+.env.*.local
+server/config.json
+server/.env
+ha-integration/.env
+
+# Tesla API credentials
+tesla_token.json
+refresh_token.txt
+access_token.txt
+
+# Docker
+docker-compose.override.yml
+
+# Kafka data
+server/kafka-data/
+server/zookeeper-data/
+
+# Logs
+*.log
+logs/
+server/logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Home Assistant
+ha-integration/custom_components/tesla_telemetry_local/.storage/
+secrets.yaml
+
+# Backup files
+*.backup
+*.bak
+*.old
+*.orig
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node modules (if any)
+node_modules/
+
+# OS files
+Thumbs.db
+.DS_Store

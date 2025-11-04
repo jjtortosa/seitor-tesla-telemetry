@@ -1,0 +1,33 @@
+{
+  "host": "tesla-telemetry.seitor.com",
+  "port": 443,
+  "log_level": "info",
+  "json_log_enable": true,
+  "namespace": "tesla",
+  "tls": {
+    "server_cert": "/certs/fullchain.pem",
+    "server_key": "/certs/privkey.pem"
+  },
+  "kafka": {
+    "brokers": ["kafka:9092"],
+    "topic": "tesla_telemetry"
+  },
+  "rate_limit": {
+    "enabled": true,
+    "message_limit": 1000,
+    "message_interval_time_seconds": 30
+  },
+  "reliable_ack": true,
+  "reliable_ack_sources": {
+    "source_names": ["kafka"]
+  },
+  "metrics": {
+    "port": 8443,
+    "enabled": true,
+    "namespace": "tesla_telemetry"
+  },
+  "monitoring": {
+    "prometheus_metrics_port": 9090,
+    "profiler_port": 4269
+  }
+}
