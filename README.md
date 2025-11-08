@@ -83,12 +83,18 @@ Complete setup guides from infrastructure to automation examples.
 
 ## Documentation
 
+### Setup Guides
 - [01 - Project Overview](docs/01_overview.md)
 - [02 - Infrastructure Setup](docs/02_infrastructure_setup.md)
 - [03 - Tesla Developer Setup](docs/03_tesla_developer_setup.md)
 - [04 - Server Deployment](docs/04_server_deployment.md)
 - [05 - Home Assistant Integration](docs/05_ha_integration.md)
 - [06 - Troubleshooting](docs/06_troubleshooting.md)
+
+### Testing & Validation
+- [07 - Real-World Testing](docs/07_real_world_testing.md) ⭐ **NEW**
+- [Testing Checklist](tools/testing/TEST_CHECKLIST.md)
+- [Setup Verification Script](tools/testing/verify_setup.sh)
 
 ## Cost Comparison
 
