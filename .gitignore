@@ -98,3 +98,4 @@ Thumbs.db
 .DS_Store
 .venv/
 CLAUDE.md
+DEPLOYMENT_CONFIG.md
