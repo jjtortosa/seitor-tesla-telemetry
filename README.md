@@ -36,8 +36,16 @@ Custom component that consumes Kafka messages and creates HA entities.
 - **Entities created**: device_tracker, sensors, binary_sensors
 - **Real-time updates**: Location, shift state, speed, charging status
 - **No polling required**: Push-based updates from Kafka
+- **Protobuf parsing**: Full support for 258+ Tesla vehicle data fields
 
-### 3. Documentation (`docs/`)
+### 3. Protobuf Tools (`tools/protobuf/`)
+Compilation tools for Tesla's official Protocol Buffers schema.
+
+- **Schema**: Tesla's `vehicle_data.proto` (258+ fields)
+- **Compilation**: Automated script (`compile_proto.sh`)
+- **Documentation**: Complete reference and troubleshooting guide
+
+### 4. Documentation (`docs/`)
 Complete setup guides from infrastructure to automation examples.
 
 ## Quick Start
@@ -120,5 +128,6 @@ Built by [@seitor](https://github.com/seitor) for personal use at ha.seitor.com
 - ✅ Documentation (6 guides, ~20k words)
 - ✅ Server infrastructure (Docker Compose stack)
 - ✅ Home Assistant integration (full custom component)
-- ⏳ Protobuf schema (placeholder, needs compilation)
+- ✅ Protobuf schema (compiled and integrated)
+- ✅ Testing tools (mock data, debugging utilities)
 - ⏳ Real-world testing pending

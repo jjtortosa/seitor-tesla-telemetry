@@ -56,7 +56,7 @@ source /srv/homeassistant/bin/activate
 
 ```bash
 # Install kafka-python and protobuf
-pip3 install kafka-python==2.0.2 protobuf==4.25.1
+pip3 install kafka-python==2.0.2 protobuf>=5.27.0
 ```
 
 **Verify installation**:

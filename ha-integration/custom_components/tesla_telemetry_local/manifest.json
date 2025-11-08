@@ -8,7 +8,7 @@
   "iot_class": "local_push",
   "requirements": [
     "kafka-python==2.0.2",
-    "protobuf==4.25.1"
+    "protobuf>=5.27.0"
   ],
   "version": "0.1.0",
   "dependencies": [],

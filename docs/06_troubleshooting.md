@@ -513,7 +513,7 @@ ls -la /config/custom_components/tesla_telemetry_local/
 1. **Missing dependencies**:
    ```bash
    # Install in HA container
-   docker exec -it homeassistant pip3 install kafka-python==2.0.2 protobuf==4.25.1
+   docker exec -it homeassistant pip3 install kafka-python==2.0.2 protobuf>=5.27.0
 
    # Restart HA
    ha core restart

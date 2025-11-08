@@ -165,44 +165,126 @@ class TeslaKafkaConsumer:
             _LOGGER.error("Error processing message: %s", err)
 
     async def _parse_protobuf(self, raw_data: bytes) -> Optional[Dict[str, Any]]:
-        """Parse Protobuf message."""
+        """Parse Protobuf message from Tesla Fleet Telemetry."""
         try:
             # Import Protobuf schema (generated from vehicle_data.proto)
-            # For now, we'll use a simplified parser
-            # In production, use: from . import vehicle_data_pb2
+            from . import vehicle_data_pb2
 
-            # TODO: Implement proper Protobuf parsing
-            # vehicle_data = vehicle_data_pb2.VehicleData()
-            # vehicle_data.ParseFromString(raw_data)
+            # Parse the Protobuf Payload message
+            payload = vehicle_data_pb2.Payload()
+            payload.ParseFromString(raw_data)
 
-            # For now, return a placeholder
-            # This will be replaced with actual Protobuf parsing
-            data = self._parse_simplified(raw_data)
+            # Convert Payload to a dictionary for easier handling
+            data = {}
+
+            # Extract VIN
+            if payload.vin:
+                data["vin"] = payload.vin
+
+            # Extract timestamp
+            if payload.HasField("created_at"):
+                data["timestamp"] = payload.created_at.seconds
+
+            # Extract all data fields
+            for datum in payload.data:
+                field_name = vehicle_data_pb2.Field.Name(datum.key)
+                value = self._extract_value(datum.value)
+
+                if value is not None:
+                    data[field_name] = value
 
             return data
 
         except Exception as err:
             _LOGGER.error("Failed to parse Protobuf message: %s", err)
+            _LOGGER.debug("Raw data: %s", raw_data[:100])  # Log first 100 bytes
             return None
 
-    def _parse_simplified(self, raw_data: bytes) -> Dict[str, Any]:
-        """Simplified parser (placeholder for Protobuf parsing)."""
-        # This is a placeholder implementation
-        # Real implementation will use vehicle_data_pb2.py
+    def _extract_value(self, value_msg: Any) -> Any:
+        """Extract value from Protobuf Value message."""
+        # The Value message has a oneof field, so we need to check which field is set
+        from . import vehicle_data_pb2
 
-        # For testing, you can decode simple JSON messages
-        # or return mock data
+        # Check which value field is set
+        which = value_msg.WhichOneof("value")
 
+        if which is None or which == "invalid":
+            return None
+
+        # String value
+        if which == "string_value":
+            return value_msg.string_value
+
+        # Integer values
+        if which == "int_value":
+            return value_msg.int_value
+        if which == "long_value":
+            return value_msg.long_value
+
+        # Float values
+        if which == "float_value":
+            return value_msg.float_value
+        if which == "double_value":
+            return value_msg.double_value
+
+        # Boolean value
+        if which == "boolean_value":
+            return value_msg.boolean_value
+
+        # Location value (GPS coordinates)
+        if which == "location_value":
+            return {
+                "latitude": value_msg.location_value.latitude,
+                "longitude": value_msg.location_value.longitude,
+            }
+
+        # Enum values (convert to string)
+        if which == "charging_value":
+            return vehicle_data_pb2.ChargingState.Name(value_msg.charging_value)
+        if which == "shift_state_value":
+            return vehicle_data_pb2.ShiftState.Name(value_msg.shift_state_value)
+
+        # Time value
+        if which == "time_value":
+            return {
+                "hour": value_msg.time_value.hour,
+                "minute": value_msg.time_value.minute,
+                "second": value_msg.time_value.second,
+            }
+
+        # Door values
+        if which == "door_value":
+            return {
+                "driver_front": value_msg.door_value.DriverFront,
+                "driver_rear": value_msg.door_value.DriverRear,
+                "passenger_front": value_msg.door_value.PassengerFront,
+                "passenger_rear": value_msg.door_value.PassengerRear,
+                "trunk_front": value_msg.door_value.TrunkFront,
+                "trunk_rear": value_msg.door_value.TrunkRear,
+            }
+
+        # Tire location (for TPMS)
+        if which == "tire_location_value":
+            return {
+                "front_left": value_msg.tire_location_value.front_left,
+                "front_right": value_msg.tire_location_value.front_right,
+                "rear_left": value_msg.tire_location_value.rear_left,
+                "rear_right": value_msg.tire_location_value.rear_right,
+            }
+
+        # For other enum types, try to convert to string
         try:
-            import json
-            # Try JSON first (for testing)
-            data = json.loads(raw_data.decode("utf-8"))
-            return data
+            # Get the enum type name and convert to string
+            enum_value = getattr(value_msg, which)
+            if hasattr(enum_value, "Name"):
+                return enum_value.Name(enum_value)
+            return int(enum_value)
         except Exception:
-            # If not JSON, return empty dict
-            # Real implementation will parse Protobuf
-            _LOGGER.warning("Simplified parser used - implement Protobuf parsing")
-            return {}
+            pass
+
+        # Fallback: return the raw value
+        _LOGGER.debug("Unknown value type: %s", which)
+        return getattr(value_msg, which, None)
 
     async def _notify_callbacks(self, data: Dict[str, Any]) -> None:
         """Notify registered callbacks with parsed data."""
