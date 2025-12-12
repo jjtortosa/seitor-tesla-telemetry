@@ -2,6 +2,44 @@
 
 Self-hosted Tesla Fleet Telemetry server with custom Home Assistant integration for real-time vehicle data streaming.
 
+---
+
+## ⚠️ Difficulty Warning
+
+> **This is an ADVANCED project.** Estimated setup time: **8-12 hours**.
+
+### You SHOULD attempt this if you:
+- ✅ Have experience with Docker, Linux, and command line
+- ✅ Understand networking (DNS, port forwarding, SSL certificates)
+- ✅ Own a server (Proxmox, Synology, VPS, etc.)
+- ✅ Have a domain name you control
+- ✅ Are comfortable debugging complex systems
+- ✅ Want full control and don't mind the effort
+
+### You should NOT attempt this if you:
+- ❌ Only install integrations via HACS with one click
+- ❌ Have never used SSH or a terminal
+- ❌ Don't have your own server infrastructure
+- ❌ Expect it to "just work" without troubleshooting
+
+### Easier Alternative
+
+**[Teslemetry.com](https://teslemetry.com)** - $5/month, 30-minute setup, same real-time data. Seriously consider this if you value your time.
+
+### Requirements Summary
+
+| Requirement | Difficulty |
+|-------------|------------|
+| Tesla Developer account (partner registration) | 🟡 Medium |
+| Public domain + Let's Encrypt SSL | 🟡 Medium |
+| Server running Docker + Kafka | 🔴 High |
+| Public port 443 (port forwarding/DDNS) | 🔴 High |
+| EC key pair + virtual key pairing | 🔴 High |
+| OAuth flow + token management | 🟡 Medium |
+| Send telemetry config to vehicle | 🔴 High |
+
+---
+
 ## Overview
 
 This project provides a complete solution for streaming Tesla vehicle data to Home Assistant using Tesla's Fleet Telemetry API. Unlike polling-based approaches, this system receives push notifications from your Tesla vehicle with sub-second latency.
