@@ -25,12 +25,14 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # Sensor definitions: (name, field_name, unit, device_class, icon, state_class)
+# Field names must match Protobuf field names from Tesla Fleet Telemetry
 SENSOR_DEFINITIONS = [
-    ("Speed", "Speed", UnitOfSpeed.KILOMETERS_PER_HOUR, None, "mdi:speedometer", SensorStateClass.MEASUREMENT),
-    ("Shift State", "ShiftState", None, None, "mdi:car-shift-pattern", None),
+    ("Speed", "VehicleSpeed", UnitOfSpeed.KILOMETERS_PER_HOUR, None, "mdi:speedometer", SensorStateClass.MEASUREMENT),
+    ("Shift State", "Gear", None, None, "mdi:car-shift-pattern", None),
     ("Battery", "Soc", PERCENTAGE, SensorDeviceClass.BATTERY, None, SensorStateClass.MEASUREMENT),
+    ("Battery Level", "BatteryLevel", PERCENTAGE, SensorDeviceClass.BATTERY, None, SensorStateClass.MEASUREMENT),
     ("Range", "EstBatteryRange", UnitOfLength.KILOMETERS, None, "mdi:map-marker-distance", SensorStateClass.MEASUREMENT),
-    ("Charging State", "ChargingState", None, None, "mdi:ev-station", None),
+    ("Charging State", "ChargeState", None, None, "mdi:ev-station", None),
     ("Charger Voltage", "ChargerVoltage", UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, None, SensorStateClass.MEASUREMENT),
     ("Charger Current", "ChargerActualCurrent", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT, None, SensorStateClass.MEASUREMENT),
     ("Odometer", "Odometer", UnitOfLength.KILOMETERS, None, "mdi:counter", SensorStateClass.TOTAL_INCREASING),
@@ -74,6 +76,7 @@ async def async_setup_platform(
     consumer = hass.data[DOMAIN]["consumer"]
     for entity in entities:
         consumer.register_callback(entity._field_name, entity.update_value)
+        _LOGGER.info("Registered callback for field: %s", entity._field_name)
 
 
 class TeslaSensor(SensorEntity):
@@ -121,19 +124,19 @@ class TeslaSensor(SensorEntity):
         return self._attributes
 
     @callback
-    async def update_value(self, value: Any, data: Dict[str, Any]) -> None:
+    def update_value(self, value: Any, data: Dict[str, Any]) -> None:
         """Update sensor value from Kafka message."""
         try:
             # Update state based on field type
-            if self._field_name == "ShiftState":
-                # Convert to uppercase and handle None
+            if self._field_name == "Gear":
+                # Gear/Shift state: P, R, N, D
                 self._state = str(value).upper() if value else "P"
 
-            elif self._field_name == "Soc":
+            elif self._field_name in ["Soc", "BatteryLevel"]:
                 # Battery percentage
                 self._state = round(float(value), 1) if value is not None else None
 
-            elif self._field_name == "Speed":
+            elif self._field_name == "VehicleSpeed":
                 # Speed in km/h
                 self._state = round(float(value), 1) if value is not None else 0
 
@@ -141,8 +144,8 @@ class TeslaSensor(SensorEntity):
                 # Range in km
                 self._state = round(float(value), 1) if value is not None else None
 
-            elif self._field_name == "ChargingState":
-                # Charging state: Charging, Complete, Disconnected, etc.
+            elif self._field_name == "ChargeState":
+                # Charging state: Charging, Complete, Disconnected, Enable, etc.
                 self._state = str(value).capitalize() if value else "Disconnected"
 
             elif self._field_name in ["ChargerVoltage", "ChargerActualCurrent"]:

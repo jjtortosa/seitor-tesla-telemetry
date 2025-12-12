@@ -1,5 +1,6 @@
-"""Kafka consumer for Tesla Fleet Telemetry messages."""
+"""Kafka consumer for Tesla Fleet Telemetry messages (JSON format)."""
 import asyncio
+import json
 import logging
 from typing import Any, Callable, Dict, Optional
 
@@ -7,7 +8,6 @@ from kafka import KafkaConsumer
 from kafka.errors import KafkaError
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.event import async_call_later
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,10 +36,11 @@ class TeslaKafkaConsumer:
         self._reconnect_attempts = 0
         self._callbacks: Dict[str, list[Callable]] = {}
 
-        _LOGGER.debug(
-            "Initialized TeslaKafkaConsumer: broker=%s, topic=%s",
+        _LOGGER.info(
+            "Initialized TeslaKafkaConsumer: broker=%s, topic=%s, vin=%s",
             broker,
             topic,
+            vehicle_vin[:8] + "***",
         )
 
     def register_callback(self, data_type: str, callback: Callable) -> None:
@@ -53,8 +54,6 @@ class TeslaKafkaConsumer:
         """Start the Kafka consumer."""
         _LOGGER.info("Starting Tesla Kafka consumer")
         self._running = True
-
-        # Connect in a separate task to avoid blocking
         asyncio.create_task(self._connect_and_consume())
 
     async def stop(self) -> None:
@@ -94,11 +93,9 @@ class TeslaKafkaConsumer:
         )
 
         try:
-            # Create Kafka consumer in executor to avoid blocking
             self._consumer = await self._hass.async_add_executor_job(
                 self._create_consumer
             )
-
             _LOGGER.info("Successfully connected to Kafka broker")
             self._reconnect_attempts = 0
 
@@ -112,10 +109,10 @@ class TeslaKafkaConsumer:
         return KafkaConsumer(
             self._topic,
             bootstrap_servers=[self._broker],
-            auto_offset_reset="latest",  # Start from latest messages
+            auto_offset_reset="latest",
             enable_auto_commit=True,
-            group_id=f"ha_tesla_{self._vehicle_vin}",
-            value_deserializer=None,  # We'll handle Protobuf parsing manually
+            group_id=f"ha_tesla_{self._vehicle_vin}_json",
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
             session_timeout_ms=30000,
             heartbeat_interval_ms=10000,
         )
@@ -125,11 +122,10 @@ class TeslaKafkaConsumer:
         if not self._consumer:
             return
 
-        _LOGGER.info("Starting to consume messages from topic: %s", self._topic)
+        _LOGGER.info("Starting to consume JSON messages from topic: %s", self._topic)
 
         while self._running and self._consumer:
             try:
-                # Poll for messages (non-blocking with timeout)
                 messages = await self._hass.async_add_executor_job(
                     lambda: self._consumer.poll(timeout_ms=1000)
                 )
@@ -143,148 +139,87 @@ class TeslaKafkaConsumer:
                 raise
 
     async def _process_message(self, record: Any) -> None:
-        """Process a single Kafka message."""
+        """Process a single Kafka message (JSON format)."""
         try:
-            # Parse Protobuf message
-            data = await self._parse_protobuf(record.value)
+            data = record.value  # Already parsed as JSON by deserializer
 
-            if data is None:
+            if not data:
                 return
 
-            # Log message reception
-            _LOGGER.debug(
-                "Received telemetry message: offset=%d, fields=%s",
-                record.offset,
-                list(data.keys())[:5],  # Log first 5 fields
-            )
+            # Check VIN matches
+            vin = data.get("vin", "")
+            if vin and vin != self._vehicle_vin:
+                return
 
-            # Notify callbacks
-            await self._notify_callbacks(data)
+            # Parse data fields
+            parsed_data = self._parse_json_data(data)
+
+            if parsed_data:
+                _LOGGER.debug(
+                    "Received telemetry: vin=%s, fields=%s",
+                    vin[-8:] if vin else "unknown",
+                    list(parsed_data.keys()),
+                )
+                await self._notify_callbacks(parsed_data)
 
         except Exception as err:
             _LOGGER.error("Error processing message: %s", err)
 
-    async def _parse_protobuf(self, raw_data: bytes) -> Optional[Dict[str, Any]]:
-        """Parse Protobuf message from Tesla Fleet Telemetry."""
-        try:
-            # Import Protobuf schema (generated from vehicle_data.proto)
-            from . import vehicle_data_pb2
+    def _parse_json_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse JSON telemetry data from fleet-telemetry."""
+        result = {}
 
-            # Parse the Protobuf Payload message
-            payload = vehicle_data_pb2.Payload()
-            payload.ParseFromString(raw_data)
+        # Extract VIN and timestamp
+        if data.get("vin"):
+            result["vin"] = data["vin"]
+        if data.get("createdAt"):
+            result["timestamp"] = data["createdAt"]
 
-            # Convert Payload to a dictionary for easier handling
-            data = {}
+        # Parse data array
+        for item in data.get("data", []):
+            key = item.get("key")
+            value_obj = item.get("value", {})
 
-            # Extract VIN
-            if payload.vin:
-                data["vin"] = payload.vin
+            if not key:
+                continue
 
-            # Extract timestamp
-            if payload.HasField("created_at"):
-                data["timestamp"] = payload.created_at.seconds
+            # Extract the actual value based on type
+            value = self._extract_value(value_obj)
+            if value is not None:
+                result[key] = value
 
-            # Extract all data fields
-            for datum in payload.data:
-                field_name = vehicle_data_pb2.Field.Name(datum.key)
-                value = self._extract_value(datum.value)
+        return result
 
-                if value is not None:
-                    data[field_name] = value
-
-            return data
-
-        except Exception as err:
-            _LOGGER.error("Failed to parse Protobuf message: %s", err)
-            _LOGGER.debug("Raw data: %s", raw_data[:100])  # Log first 100 bytes
+    def _extract_value(self, value_obj: Dict[str, Any]) -> Any:
+        """Extract value from the value object."""
+        # Check each possible value type
+        if "stringValue" in value_obj:
+            return value_obj["stringValue"]
+        if "doubleValue" in value_obj:
+            return value_obj["doubleValue"]
+        if "floatValue" in value_obj:
+            return value_obj["floatValue"]
+        if "intValue" in value_obj:
+            return value_obj["intValue"]
+        if "longValue" in value_obj:
+            return value_obj["longValue"]
+        if "booleanValue" in value_obj:
+            return value_obj["booleanValue"]
+        if "locationValue" in value_obj:
+            loc = value_obj["locationValue"]
+            return {
+                "latitude": loc.get("latitude"),
+                "longitude": loc.get("longitude"),
+            }
+        if "invalid" in value_obj:
             return None
 
-    def _extract_value(self, value_msg: Any) -> Any:
-        """Extract value from Protobuf Value message."""
-        # The Value message has a oneof field, so we need to check which field is set
-        from . import vehicle_data_pb2
+        # Return first available value
+        for key, val in value_obj.items():
+            if val is not None:
+                return val
 
-        # Check which value field is set
-        which = value_msg.WhichOneof("value")
-
-        if which is None or which == "invalid":
-            return None
-
-        # String value
-        if which == "string_value":
-            return value_msg.string_value
-
-        # Integer values
-        if which == "int_value":
-            return value_msg.int_value
-        if which == "long_value":
-            return value_msg.long_value
-
-        # Float values
-        if which == "float_value":
-            return value_msg.float_value
-        if which == "double_value":
-            return value_msg.double_value
-
-        # Boolean value
-        if which == "boolean_value":
-            return value_msg.boolean_value
-
-        # Location value (GPS coordinates)
-        if which == "location_value":
-            return {
-                "latitude": value_msg.location_value.latitude,
-                "longitude": value_msg.location_value.longitude,
-            }
-
-        # Enum values (convert to string)
-        if which == "charging_value":
-            return vehicle_data_pb2.ChargingState.Name(value_msg.charging_value)
-        if which == "shift_state_value":
-            return vehicle_data_pb2.ShiftState.Name(value_msg.shift_state_value)
-
-        # Time value
-        if which == "time_value":
-            return {
-                "hour": value_msg.time_value.hour,
-                "minute": value_msg.time_value.minute,
-                "second": value_msg.time_value.second,
-            }
-
-        # Door values
-        if which == "door_value":
-            return {
-                "driver_front": value_msg.door_value.DriverFront,
-                "driver_rear": value_msg.door_value.DriverRear,
-                "passenger_front": value_msg.door_value.PassengerFront,
-                "passenger_rear": value_msg.door_value.PassengerRear,
-                "trunk_front": value_msg.door_value.TrunkFront,
-                "trunk_rear": value_msg.door_value.TrunkRear,
-            }
-
-        # Tire location (for TPMS)
-        if which == "tire_location_value":
-            return {
-                "front_left": value_msg.tire_location_value.front_left,
-                "front_right": value_msg.tire_location_value.front_right,
-                "rear_left": value_msg.tire_location_value.rear_left,
-                "rear_right": value_msg.tire_location_value.rear_right,
-            }
-
-        # For other enum types, try to convert to string
-        try:
-            # Get the enum type name and convert to string
-            enum_value = getattr(value_msg, which)
-            if hasattr(enum_value, "Name"):
-                return enum_value.Name(enum_value)
-            return int(enum_value)
-        except Exception:
-            pass
-
-        # Fallback: return the raw value
-        _LOGGER.debug("Unknown value type: %s", which)
-        return getattr(value_msg, which, None)
+        return None
 
     async def _notify_callbacks(self, data: Dict[str, Any]) -> None:
         """Notify registered callbacks with parsed data."""
@@ -293,12 +228,8 @@ class TeslaKafkaConsumer:
                 value = data[data_type]
                 for callback in callbacks:
                     try:
-                        if asyncio.iscoroutinefunction(callback):
-                            await callback(value, data)
-                        else:
-                            await self._hass.async_add_executor_job(
-                                callback, value, data
-                            )
+                        callback(value, data)
+                        _LOGGER.debug("Called callback for %s: %s", data_type, value)
                     except Exception as err:
                         _LOGGER.error(
                             "Error in callback for %s: %s", data_type, err
@@ -324,7 +255,6 @@ class TeslaKafkaConsumer:
             MAX_RECONNECT_ATTEMPTS,
         )
 
-        # Close existing consumer
         if self._consumer:
             try:
                 await self._hass.async_add_executor_job(self._consumer.close)
@@ -332,5 +262,4 @@ class TeslaKafkaConsumer:
                 pass
             self._consumer = None
 
-        # Wait before reconnecting
         await asyncio.sleep(delay)

@@ -13,6 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME, Platform
 from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.discovery import async_load_platform
 from homeassistant.helpers.typing import ConfigType
 
 from .kafka_consumer import TeslaKafkaConsumer
@@ -78,16 +79,21 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     hass.data[DOMAIN]["consumer"] = consumer
 
-    # Start consumer in background
-    hass.async_create_task(consumer.start())
-
-    # Load platforms
+    # Load platforms FIRST (so entities can register callbacks)
     for platform in PLATFORMS:
         hass.async_create_task(
-            hass.helpers.discovery.async_load_platform(
-                platform, DOMAIN, conf, config
+            async_load_platform(
+                hass, platform, DOMAIN, conf, config
             )
         )
+
+    # Start consumer AFTER platforms are loaded (with delay for callbacks to register)
+    async def delayed_start():
+        await asyncio.sleep(10)  # Wait for entities to register callbacks
+        _LOGGER.info("Starting Kafka consumer after platform load delay")
+        await consumer.start()
+
+    hass.async_create_task(delayed_start())
 
     _LOGGER.info("Tesla Fleet Telemetry Local integration loaded successfully")
 
