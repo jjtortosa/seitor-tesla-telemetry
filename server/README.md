@@ -2,13 +2,55 @@
 
 Docker-based Tesla Fleet Telemetry server with Kafka message queue.
 
-## Quick Start
+## Quick Start (Recommended)
+
+### 1. Run Interactive Setup
+
+```bash
+./setup.sh
+```
+
+This will guide you through:
+- Domain configuration
+- Kafka network settings
+- Tesla API key generation
+- All configuration file creation
+
+### 2. Add SSL Certificates
+
+Copy your certificates to `certs/`:
+
+```bash
+certs/
+├── fullchain.pem   # Certificate + chain
+└── privkey.pem     # Private key
+```
+
+### 3. Start Services
+
+```bash
+docker compose up -d
+```
+
+### 4. Verify
+
+```bash
+docker compose ps
+docker compose logs -f fleet-telemetry
+```
+
+---
+
+## Manual Setup (Alternative)
+
+If you prefer manual configuration:
 
 ### 1. Copy Configuration
 
 ```bash
+cp .env.example .env
 cp config.json.example config.json
-nano config.json  # Edit with your domain and settings
+# Edit both files with your settings
 ```
 
 ### 2. Generate Keys
@@ -17,28 +59,13 @@ nano config.json  # Edit with your domain and settings
 ./scripts/generate_keys.sh
 ```
 
-This creates:
-- `keys/private_key.pem` (keep secret!)
-- `keys/public_key.pem`
-- `keys/com.tesla.3p.public-key.pem`
-
 ### 3. Prepare SSL Certificates
 
-Ensure your Let's Encrypt certificates are accessible:
-
-```bash
-# Create symlink to certificates
-mkdir -p certs
-ln -s /etc/letsencrypt/live/tesla-telemetry.seitor.com/fullchain.pem certs/
-ln -s /etc/letsencrypt/live/tesla-telemetry.seitor.com/privkey.pem certs/
-```
-
-Or copy them:
-
 ```bash
 mkdir -p certs
-cp /etc/letsencrypt/live/tesla-telemetry.seitor.com/fullchain.pem certs/
-cp /etc/letsencrypt/live/tesla-telemetry.seitor.com/privkey.pem certs/
+# Copy your certificates:
+cp /path/to/fullchain.pem certs/
+cp /path/to/privkey.pem certs/
 chmod 644 certs/fullchain.pem
 chmod 600 certs/privkey.pem
 ```
@@ -49,22 +76,13 @@ chmod 600 certs/privkey.pem
 docker compose up -d
 ```
 
-### 5. Check Status
+### 5. Access Kafka UI (optional)
 
 ```bash
-# View logs
-docker compose logs -f fleet-telemetry
-
-# Check health
-docker compose ps
-
-# Test Kafka
-docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
+# Start with debug profile
+docker compose --profile debug up -d
+# Open http://localhost:8080
 ```
-
-### 6. Access Kafka UI (optional)
-
-Open http://localhost:8080 to view Kafka topics and messages.
 
 ## Directory Structure
 
