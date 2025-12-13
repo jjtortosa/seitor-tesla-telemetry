@@ -2,49 +2,49 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configuracio del Broker Kafka",
-        "description": "Configura la connexio al teu broker Kafka.\n\nNota: Aquesta integracio requereix un servidor Tesla Fleet Telemetry auto-allotjat amb Kafka. Consulta la documentacio per les instruccions de configuracio.",
+        "title": "Configuració del Broker Kafka",
+        "description": "Configura la connexió al teu broker Kafka.\n\nNota: Aquesta integració requereix un servidor Tesla Fleet Telemetry auto-allotjat amb Kafka. Consulta la documentació per les instruccions de configuració.",
         "data": {
-          "kafka_broker": "Adreca del Broker Kafka",
+          "kafka_broker": "Adreça del Broker Kafka",
           "kafka_topic": "Topic Kafka"
         },
         "data_description": {
-          "kafka_broker": "Adreca del teu broker Kafka (p.ex., 192.168.1.100:9092)",
+          "kafka_broker": "Adreça del teu broker Kafka (p.ex., 192.168.1.100:9092)",
           "kafka_topic": "Topic on es publiquen els missatges de telemetria Tesla"
         }
       },
       "vehicle": {
-        "title": "Configuracio del Vehicle",
+        "title": "Configuració del Vehicle",
         "description": "Configura el teu vehicle Tesla.\n\nConnectat al broker: {broker}",
         "data": {
           "vehicle_vin": "VIN del Vehicle",
           "vehicle_name": "Nom del Vehicle"
         },
         "data_description": {
-          "vehicle_vin": "Numero d'Identificacio del Vehicle de 17 caracters",
+          "vehicle_vin": "Número d'Identificació del Vehicle de 17 caràcters",
           "vehicle_name": "Nom amigable per al teu vehicle"
         }
       }
     },
     "error": {
-      "broker_connection_failed": "No s'ha pogut connectar al broker Kafka. Verifica l'adreca i assegura't que el broker esta en funcionament.",
-      "broker_timeout": "S'ha esgotat el temps de connexio al broker Kafka. Comprova la connectivitat de xarxa.",
-      "broker_invalid_port": "Numero de port invalid a l'adreca del broker.",
-      "vin_required": "El VIN es obligatori.",
-      "vin_invalid_length": "El VIN ha de tenir exactament 17 caracters.",
-      "vin_invalid_format": "El VIN conte caracters no valids. Nomes es permeten lletres (excepte I, O, Q) i numeros."
+      "broker_connection_failed": "No s'ha pogut connectar al broker Kafka. Verifica l'adreça i assegura't que el broker està en funcionament.",
+      "broker_timeout": "S'ha esgotat el temps de connexió al broker Kafka. Comprova la connectivitat de xarxa.",
+      "broker_invalid_port": "Número de port invàlid a l'adreça del broker.",
+      "vin_required": "El VIN és obligatori.",
+      "vin_invalid_length": "El VIN ha de tenir exactament 17 caràcters.",
+      "vin_invalid_format": "El VIN conté caràcters no vàlids. Només es permeten lletres (excepte I, O, Q) i números."
     },
     "abort": {
-      "already_configured": "Aquest vehicle ja esta configurat."
+      "already_configured": "Aquest vehicle ja està configurat."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Opcions Tesla Fleet Telemetry",
-        "description": "Actualitza la configuracio de la integracio. El VIN no es pot canviar.",
+        "description": "Actualitza la configuració de la integració. El VIN no es pot canviar.",
         "data": {
-          "kafka_broker": "Adreca del Broker Kafka",
+          "kafka_broker": "Adreça del Broker Kafka",
           "kafka_topic": "Topic Kafka",
           "vehicle_name": "Nom del Vehicle"
         }
@@ -52,7 +52,7 @@
     },
     "error": {
       "broker_connection_failed": "No s'ha pogut connectar al broker Kafka.",
-      "broker_timeout": "S'ha esgotat el temps de connexio al broker Kafka."
+      "broker_timeout": "S'ha esgotat el temps de connexió al broker Kafka."
     }
   }
 }
