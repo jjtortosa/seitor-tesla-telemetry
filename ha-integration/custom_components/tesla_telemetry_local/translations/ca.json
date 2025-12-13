@@ -1,0 +1,58 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configuracio del Broker Kafka",
+        "description": "Configura la connexio al teu broker Kafka.\n\nNota: Aquesta integracio requereix un servidor Tesla Fleet Telemetry auto-allotjat amb Kafka. Consulta la documentacio per les instruccions de configuracio.",
+        "data": {
+          "kafka_broker": "Adreca del Broker Kafka",
+          "kafka_topic": "Topic Kafka"
+        },
+        "data_description": {
+          "kafka_broker": "Adreca del teu broker Kafka (p.ex., 192.168.1.100:9092)",
+          "kafka_topic": "Topic on es publiquen els missatges de telemetria Tesla"
+        }
+      },
+      "vehicle": {
+        "title": "Configuracio del Vehicle",
+        "description": "Configura el teu vehicle Tesla.\n\nConnectat al broker: {broker}",
+        "data": {
+          "vehicle_vin": "VIN del Vehicle",
+          "vehicle_name": "Nom del Vehicle"
+        },
+        "data_description": {
+          "vehicle_vin": "Numero d'Identificacio del Vehicle de 17 caracters",
+          "vehicle_name": "Nom amigable per al teu vehicle"
+        }
+      }
+    },
+    "error": {
+      "broker_connection_failed": "No s'ha pogut connectar al broker Kafka. Verifica l'adreca i assegura't que el broker esta en funcionament.",
+      "broker_timeout": "S'ha esgotat el temps de connexio al broker Kafka. Comprova la connectivitat de xarxa.",
+      "broker_invalid_port": "Numero de port invalid a l'adreca del broker.",
+      "vin_required": "El VIN es obligatori.",
+      "vin_invalid_length": "El VIN ha de tenir exactament 17 caracters.",
+      "vin_invalid_format": "El VIN conte caracters no valids. Nomes es permeten lletres (excepte I, O, Q) i numeros."
+    },
+    "abort": {
+      "already_configured": "Aquest vehicle ja esta configurat."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcions Tesla Fleet Telemetry",
+        "description": "Actualitza la configuracio de la integracio. El VIN no es pot canviar.",
+        "data": {
+          "kafka_broker": "Adreca del Broker Kafka",
+          "kafka_topic": "Topic Kafka",
+          "vehicle_name": "Nom del Vehicle"
+        }
+      }
+    },
+    "error": {
+      "broker_connection_failed": "No s'ha pogut connectar al broker Kafka.",
+      "broker_timeout": "S'ha esgotat el temps de connexio al broker Kafka."
+    }
+  }
+}

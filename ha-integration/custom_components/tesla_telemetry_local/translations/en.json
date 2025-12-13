@@ -1,0 +1,58 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kafka Broker Configuration",
+        "description": "Configure the connection to your Kafka broker.\n\nNote: This integration requires a self-hosted Tesla Fleet Telemetry server with Kafka. See documentation for setup instructions.",
+        "data": {
+          "kafka_broker": "Kafka Broker Address",
+          "kafka_topic": "Kafka Topic"
+        },
+        "data_description": {
+          "kafka_broker": "Address of your Kafka broker (e.g., 192.168.1.100:9092)",
+          "kafka_topic": "Topic where Tesla telemetry messages are published"
+        }
+      },
+      "vehicle": {
+        "title": "Vehicle Configuration",
+        "description": "Configure your Tesla vehicle.\n\nConnected to broker: {broker}",
+        "data": {
+          "vehicle_vin": "Vehicle VIN",
+          "vehicle_name": "Vehicle Name"
+        },
+        "data_description": {
+          "vehicle_vin": "17-character Vehicle Identification Number",
+          "vehicle_name": "Friendly name for your vehicle"
+        }
+      }
+    },
+    "error": {
+      "broker_connection_failed": "Could not connect to Kafka broker. Check the address and ensure the broker is running.",
+      "broker_timeout": "Connection to Kafka broker timed out. Check network connectivity.",
+      "broker_invalid_port": "Invalid port number in broker address.",
+      "vin_required": "VIN is required.",
+      "vin_invalid_length": "VIN must be exactly 17 characters.",
+      "vin_invalid_format": "VIN contains invalid characters. Only letters (except I, O, Q) and numbers are allowed."
+    },
+    "abort": {
+      "already_configured": "This vehicle is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Tesla Fleet Telemetry Options",
+        "description": "Update the integration settings. The VIN cannot be changed.",
+        "data": {
+          "kafka_broker": "Kafka Broker Address",
+          "kafka_topic": "Kafka Topic",
+          "vehicle_name": "Vehicle Name"
+        }
+      }
+    },
+    "error": {
+      "broker_connection_failed": "Could not connect to Kafka broker.",
+      "broker_timeout": "Connection to Kafka broker timed out."
+    }
+  }
+}

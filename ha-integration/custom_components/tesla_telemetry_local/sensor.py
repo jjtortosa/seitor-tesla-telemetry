@@ -1,6 +1,8 @@
 """Support for Tesla vehicle sensors."""
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -17,50 +19,48 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from . import CONF_VEHICLE_NAME, CONF_VEHICLE_VIN, DOMAIN
+from . import TeslaTelemetryConfigEntry
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 
-# Sensor definitions: (name, field_name, unit, device_class, icon, state_class)
-# Field names must match Protobuf field names from Tesla Fleet Telemetry
-SENSOR_DEFINITIONS = [
-    ("Speed", "VehicleSpeed", UnitOfSpeed.KILOMETERS_PER_HOUR, None, "mdi:speedometer", SensorStateClass.MEASUREMENT),
-    ("Shift State", "Gear", None, None, "mdi:car-shift-pattern", None),
-    ("Battery", "Soc", PERCENTAGE, SensorDeviceClass.BATTERY, None, SensorStateClass.MEASUREMENT),
-    ("Battery Level", "BatteryLevel", PERCENTAGE, SensorDeviceClass.BATTERY, None, SensorStateClass.MEASUREMENT),
-    ("Range", "EstBatteryRange", UnitOfLength.KILOMETERS, None, "mdi:map-marker-distance", SensorStateClass.MEASUREMENT),
-    ("Charging State", "ChargeState", None, None, "mdi:ev-station", None),
-    ("Charger Voltage", "ChargerVoltage", UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, None, SensorStateClass.MEASUREMENT),
-    ("Charger Current", "ChargerActualCurrent", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT, None, SensorStateClass.MEASUREMENT),
-    ("Odometer", "Odometer", UnitOfLength.KILOMETERS, None, "mdi:counter", SensorStateClass.TOTAL_INCREASING),
+# Sensor definitions: (key, name, field_name, unit, device_class, icon, state_class)
+SENSOR_DEFINITIONS: list[tuple[str, str, str, str | None, SensorDeviceClass | None, str | None, SensorStateClass | None]] = [
+    ("speed", "Speed", "VehicleSpeed", UnitOfSpeed.KILOMETERS_PER_HOUR, None, "mdi:speedometer", SensorStateClass.MEASUREMENT),
+    ("shift_state", "Shift State", "Gear", None, None, "mdi:car-shift-pattern", None),
+    ("battery", "Battery", "Soc", PERCENTAGE, SensorDeviceClass.BATTERY, None, SensorStateClass.MEASUREMENT),
+    ("range", "Range", "EstBatteryRange", UnitOfLength.KILOMETERS, None, "mdi:map-marker-distance", SensorStateClass.MEASUREMENT),
+    ("charging_state", "Charging State", "ChargeState", None, None, "mdi:ev-station", None),
+    ("charger_voltage", "Charger Voltage", "ChargerVoltage", UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, None, SensorStateClass.MEASUREMENT),
+    ("charger_current", "Charger Current", "ChargerActualCurrent", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT, None, SensorStateClass.MEASUREMENT),
+    ("odometer", "Odometer", "Odometer", UnitOfLength.KILOMETERS, None, "mdi:counter", SensorStateClass.TOTAL_INCREASING),
 ]
 
 
-async def async_setup_platform(
+async def async_setup_entry(
     hass: HomeAssistant,
-    config: ConfigType,
+    entry: TeslaTelemetryConfigEntry,
     async_add_entities: AddEntitiesCallback,
-    discovery_info: Optional[DiscoveryInfoType] = None,
 ) -> None:
-    """Set up the Tesla sensor platform."""
-    if discovery_info is None:
-        return
-
-    vehicle_name = discovery_info.get(CONF_VEHICLE_NAME, "Tesla")
-    vehicle_vin = discovery_info.get(CONF_VEHICLE_VIN)
+    """Set up Tesla sensors from a config entry."""
+    data = entry.runtime_data
+    vehicle_name = data.vehicle_name
+    vehicle_vin = data.vehicle_vin
+    device_info = data.device_info
+    consumer = data.consumer
 
     _LOGGER.info("Setting up Tesla sensors for %s", vehicle_name)
 
     # Create sensor entities
-    entities = []
-    for name, field, unit, device_class, icon, state_class in SENSOR_DEFINITIONS:
+    entities: list[TeslaSensor] = []
+    for key, name, field, unit, device_class, icon, state_class in SENSOR_DEFINITIONS:
         entity = TeslaSensor(
-            hass=hass,
             vehicle_name=vehicle_name,
             vehicle_vin=vehicle_vin,
+            device_info=device_info,
+            sensor_key=key,
             sensor_name=name,
             field_name=field,
             unit=unit,
@@ -70,105 +70,102 @@ async def async_setup_platform(
         )
         entities.append(entity)
 
-    async_add_entities(entities, True)
+    async_add_entities(entities)
 
     # Register callbacks with Kafka consumer
-    consumer = hass.data[DOMAIN]["consumer"]
     for entity in entities:
-        consumer.register_callback(entity._field_name, entity.update_value)
-        _LOGGER.info("Registered callback for field: %s", entity._field_name)
+        consumer.register_callback(entity.field_name, entity.update_value)
+        _LOGGER.debug("Registered callback for field: %s", entity.field_name)
 
 
 class TeslaSensor(SensorEntity):
     """Representation of a Tesla vehicle sensor."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
-        hass: HomeAssistant,
         vehicle_name: str,
         vehicle_vin: str,
+        device_info: dict[str, Any],
+        sensor_key: str,
         sensor_name: str,
         field_name: str,
-        unit: Optional[str],
-        device_class: Optional[SensorDeviceClass],
-        icon: Optional[str],
-        state_class: Optional[SensorStateClass],
+        unit: str | None,
+        device_class: SensorDeviceClass | None,
+        icon: str | None,
+        state_class: SensorStateClass | None,
     ) -> None:
         """Initialize the sensor."""
-        self._hass = hass
         self._vehicle_name = vehicle_name
         self._vehicle_vin = vehicle_vin
-        self._sensor_name = sensor_name
+        self._sensor_key = sensor_key
         self._field_name = field_name
-        self._state: Optional[Any] = None
-        self._attributes: Dict[str, Any] = {}
+        self._state: Any = None
+        self._last_updated: str | None = None
 
         # Entity properties
-        self._attr_unique_id = f"tesla_{vehicle_vin.lower()}_{field_name.lower()}"
-        self._attr_name = f"{vehicle_name} {sensor_name}"
+        self._attr_unique_id = f"{vehicle_vin}_{sensor_key}"
+        self._attr_translation_key = sensor_key
+        self._attr_name = sensor_name
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class
         self._attr_icon = icon
         self._attr_state_class = state_class
+        self._attr_device_info = device_info
 
         _LOGGER.debug("Initialized Tesla sensor: %s", self._attr_name)
 
     @property
-    def native_value(self) -> Optional[Any]:
+    def field_name(self) -> str:
+        """Return the telemetry field name."""
+        return self._field_name
+
+    @property
+    def native_value(self) -> Any:
         """Return the state of the sensor."""
         return self._state
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return entity specific state attributes."""
-        return self._attributes
+        attrs: dict[str, Any] = {}
+        if self._last_updated:
+            attrs["last_updated"] = self._last_updated
+        return attrs
 
     @callback
-    def update_value(self, value: Any, data: Dict[str, Any]) -> None:
+    def update_value(self, value: Any, data: dict[str, Any]) -> None:
         """Update sensor value from Kafka message."""
         try:
             # Update state based on field type
             if self._field_name == "Gear":
-                # Gear/Shift state: P, R, N, D
                 self._state = str(value).upper() if value else "P"
 
             elif self._field_name in ["Soc", "BatteryLevel"]:
-                # Battery percentage
                 self._state = round(float(value), 1) if value is not None else None
 
             elif self._field_name == "VehicleSpeed":
-                # Speed in km/h
                 self._state = round(float(value), 1) if value is not None else 0
 
             elif self._field_name == "EstBatteryRange":
-                # Range in km
                 self._state = round(float(value), 1) if value is not None else None
 
             elif self._field_name == "ChargeState":
-                # Charging state: Charging, Complete, Disconnected, Enable, etc.
                 self._state = str(value).capitalize() if value else "Disconnected"
 
             elif self._field_name in ["ChargerVoltage", "ChargerActualCurrent"]:
-                # Charger values
                 self._state = round(float(value), 1) if value is not None else 0
 
             elif self._field_name == "Odometer":
-                # Odometer in km
                 self._state = round(float(value), 1) if value is not None else None
 
             else:
-                # Generic value
                 self._state = value
 
-            # Store raw value in attributes
-            self._attributes["raw_value"] = value
-            self._attributes["last_updated"] = data.get("timestamp", None)
+            self._last_updated = data.get("timestamp")
 
-            _LOGGER.debug(
-                "Updated sensor %s: %s",
-                self._attr_name,
-                self._state,
-            )
+            _LOGGER.debug("Updated sensor %s: %s", self._attr_name, self._state)
 
             # Trigger state update in Home Assistant
             self.async_write_ha_state()
@@ -179,19 +176,6 @@ class TeslaSensor(SensorEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        # Most sensors are always available even if value is None
-        # Except for critical ones like battery
         if self._field_name == "Soc":
             return self._state is not None
         return True
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        """Return device information for this entity."""
-        return {
-            "identifiers": {(DOMAIN, self._vehicle_vin)},
-            "name": self._vehicle_name,
-            "manufacturer": "Tesla",
-            "model": "Model Y",
-            "sw_version": None,
-        }

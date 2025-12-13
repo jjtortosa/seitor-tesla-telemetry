@@ -2,15 +2,14 @@
   "domain": "tesla_telemetry_local",
   "name": "Tesla Fleet Telemetry Local",
   "codeowners": ["@seitor"],
-  "config_flow": false,
+  "config_flow": true,
   "documentation": "https://github.com/jjtortosa/seitor-tesla-telemetry",
-  "integration_type": "hub",
+  "integration_type": "device",
   "iot_class": "local_push",
   "requirements": [
-    "kafka-python-ng>=2.2.2",
-    "protobuf>=5.27.0"
+    "kafka-python-ng>=2.2.2"
   ],
-  "version": "0.1.0",
+  "version": "1.0.0",
   "dependencies": [],
   "after_dependencies": []
 }

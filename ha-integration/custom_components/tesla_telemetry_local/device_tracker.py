@@ -1,75 +1,113 @@
-"""Support for Tesla vehicle location tracking using device_tracker.see service."""
+"""Support for Tesla vehicle location tracking."""
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
-from homeassistant.components.device_tracker import DOMAIN as DT_DOMAIN
-from homeassistant.components.device_tracker.const import SourceType
+from homeassistant.components.device_tracker import SourceType
+from homeassistant.components.device_tracker.config_entry import TrackerEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DOMAIN, CONF_VEHICLE_NAME, CONF_VEHICLE_VIN
+from . import TeslaTelemetryConfigEntry
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_scanner(
+async def async_setup_entry(
     hass: HomeAssistant,
-    config: ConfigType,
-    async_see,
-    discovery_info: Optional[DiscoveryInfoType] = None,
-) -> bool:
-    """Set up the Tesla device tracker scanner."""
-    _LOGGER.info("Tesla device_tracker async_setup_scanner called")
+    entry: TeslaTelemetryConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up Tesla device tracker from a config entry."""
+    data = entry.runtime_data
+    vehicle_name = data.vehicle_name
+    vehicle_vin = data.vehicle_vin
+    device_info = data.device_info
+    consumer = data.consumer
 
-    if discovery_info is None:
-        _LOGGER.warning("Tesla device_tracker: discovery_info is None")
-        return False
+    _LOGGER.info("Setting up Tesla device tracker for %s", vehicle_name)
 
-    vehicle_name = discovery_info.get(CONF_VEHICLE_NAME, "Tesla")
-    vehicle_vin = discovery_info.get(CONF_VEHICLE_VIN)
+    # Create tracker entity
+    tracker = TeslaDeviceTracker(
+        vehicle_name=vehicle_name,
+        vehicle_vin=vehicle_vin,
+        device_info=device_info,
+    )
 
-    if not vehicle_vin:
-        _LOGGER.error("Tesla device_tracker: vehicle_vin is missing!")
-        return False
+    async_add_entities([tracker])
 
-    _LOGGER.info("Setting up Tesla device tracker for %s (VIN: %s***)", vehicle_name, vehicle_vin[:8])
-
-    # Create tracker instance
-    tracker = TeslaLocationTracker(hass, async_see, vehicle_name, vehicle_vin)
-
-    # Register with Kafka consumer
-    consumer = hass.data[DOMAIN]["consumer"]
+    # Register callback for location updates
     consumer.register_callback("Location", tracker.update_location)
-    _LOGGER.info("Registered Location callback for device_tracker")
-
-    return True
+    _LOGGER.debug("Registered Location callback for device_tracker")
 
 
-class TeslaLocationTracker:
-    """Tesla location tracker using device_tracker.see service."""
+class TeslaDeviceTracker(TrackerEntity):
+    """Representation of a Tesla vehicle location tracker."""
+
+    _attr_has_entity_name = True
 
     def __init__(
         self,
-        hass: HomeAssistant,
-        async_see,
         vehicle_name: str,
         vehicle_vin: str,
+        device_info: dict[str, Any],
     ) -> None:
         """Initialize the tracker."""
-        self._hass = hass
-        self._async_see = async_see
         self._vehicle_name = vehicle_name
         self._vehicle_vin = vehicle_vin
-        self._dev_id = f"tesla_{vehicle_vin.lower()}"
+        self._latitude: float | None = None
+        self._longitude: float | None = None
+        self._accuracy: int = 10
+        self._speed: float | None = None
+        self._last_updated: str | None = None
 
-        _LOGGER.debug("Initialized Tesla location tracker: %s", self._dev_id)
+        # Entity properties
+        self._attr_unique_id = f"{vehicle_vin}_location"
+        self._attr_name = "Location"
+        self._attr_icon = "mdi:car-electric"
+        self._attr_device_info = device_info
+
+        _LOGGER.debug("Initialized Tesla device tracker: %s", self._attr_name)
+
+    @property
+    def source_type(self) -> SourceType:
+        """Return the source type of the tracker."""
+        return SourceType.GPS
+
+    @property
+    def latitude(self) -> float | None:
+        """Return latitude value of the device."""
+        return self._latitude
+
+    @property
+    def longitude(self) -> float | None:
+        """Return longitude value of the device."""
+        return self._longitude
+
+    @property
+    def location_accuracy(self) -> int:
+        """Return the location accuracy of the device."""
+        return self._accuracy
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return entity specific state attributes."""
+        attrs: dict[str, Any] = {}
+        if self._speed is not None:
+            attrs["speed"] = self._speed
+        if self._last_updated:
+            attrs["last_updated"] = self._last_updated
+        return attrs
 
     @callback
-    def update_location(self, value: Any, data: Dict[str, Any]) -> None:
+    def update_location(self, value: Any, data: dict[str, Any]) -> None:
         """Update location from Kafka message."""
         try:
-            lat = None
-            lon = None
+            lat: float | None = None
+            lon: float | None = None
 
             # Location comes as dict with latitude/longitude from JSON format
             if isinstance(value, dict):
@@ -77,31 +115,27 @@ class TeslaLocationTracker:
                 lon = value.get("longitude")
 
             if lat is not None and lon is not None:
+                self._latitude = float(lat)
+                self._longitude = float(lon)
+                self._speed = data.get("VehicleSpeed")
+                self._last_updated = data.get("timestamp")
+
                 _LOGGER.debug(
-                    "Updating device_tracker %s: lat=%.6f, lon=%.6f",
-                    self._dev_id,
-                    float(lat),
-                    float(lon),
+                    "Updated device_tracker %s: lat=%.6f, lon=%.6f",
+                    self._attr_unique_id,
+                    self._latitude,
+                    self._longitude,
                 )
 
-                # Use async_see to update device tracker
-                self._hass.async_create_task(
-                    self._async_see(
-                        dev_id=self._dev_id,
-                        host_name=self._vehicle_name,
-                        gps=(float(lat), float(lon)),
-                        gps_accuracy=10,
-                        source_type=SourceType.GPS,
-                        icon="mdi:car-electric",
-                        attributes={
-                            "friendly_name": f"{self._vehicle_name} Location",
-                            "last_updated": data.get("timestamp"),
-                            "speed": data.get("VehicleSpeed"),
-                        },
-                    )
-                )
+                # Trigger state update in Home Assistant
+                self.async_write_ha_state()
             else:
-                _LOGGER.debug("Location value not a dict or missing lat/lon: %s", value)
+                _LOGGER.debug("Location value missing lat/lon: %s", value)
 
         except (ValueError, TypeError) as err:
             _LOGGER.error("Error updating location: %s", err)
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._latitude is not None and self._longitude is not None
