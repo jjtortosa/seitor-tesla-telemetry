@@ -37,7 +37,7 @@ async def async_setup_entry(
     vehicle_name = data.vehicle_name
     vehicle_vin = data.vehicle_vin
     device_info = data.device_info
-    consumer = data.consumer
+    mqtt_client = data.mqtt_client
 
     _LOGGER.info("Setting up Tesla binary sensors for %s", vehicle_name)
 
@@ -59,10 +59,13 @@ async def async_setup_entry(
 
     async_add_entities(entities)
 
-    # Register callbacks with Kafka consumer
+    # Register callbacks with MQTT client
     for entity in entities:
         for field in entity.depends_on:
-            consumer.register_callback(field, entity.update_value)
+            mqtt_client.register_callback(field, entity.update_value)
+        # Also register for connectivity updates
+        if entity._sensor_key == "connected":
+            mqtt_client.register_callback("connectivity", entity.update_value)
 
 
 class TeslaBinarySensor(BinarySensorEntity):

@@ -2,20 +2,18 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configuració del Broker Kafka",
-        "description": "Configura la connexió al teu broker Kafka.\n\nNota: Aquesta integració requereix un servidor Tesla Fleet Telemetry auto-allotjat amb Kafka. Consulta la documentació per les instruccions de configuració.",
+        "title": "Configuració MQTT",
+        "description": "Configura el topic MQTT per a Tesla Fleet Telemetry.\n\nNota: Aquesta integració requereix que MQTT estigui configurat a Home Assistant i un servidor Tesla Fleet Telemetry auto-allotjat publicant a MQTT.",
         "data": {
-          "kafka_broker": "Adreça del Broker Kafka",
-          "kafka_topic": "Topic Kafka"
+          "mqtt_topic_base": "Topic Base MQTT"
         },
         "data_description": {
-          "kafka_broker": "Adreça del teu broker Kafka (p.ex., 192.168.1.100:9092)",
-          "kafka_topic": "Topic on es publiquen els missatges de telemetria Tesla"
+          "mqtt_topic_base": "Topic base utilitzat per Fleet Telemetry (p.ex., 'tesla'). Els missatges es rebran de {topic_base}/{VIN}/v/#"
         }
       },
       "vehicle": {
         "title": "Configuració del Vehicle",
-        "description": "Configura el teu vehicle Tesla.\n\nConnectat al broker: {broker}",
+        "description": "Configura el teu vehicle Tesla.\n\nTopic: {topic_base}/{VIN}/v/#",
         "data": {
           "vehicle_vin": "VIN del Vehicle",
           "vehicle_name": "Nom del Vehicle"
@@ -27,15 +25,13 @@
       }
     },
     "error": {
-      "broker_connection_failed": "No s'ha pogut connectar al broker Kafka. Verifica l'adreça i assegura't que el broker està en funcionament.",
-      "broker_timeout": "S'ha esgotat el temps de connexió al broker Kafka. Comprova la connectivitat de xarxa.",
-      "broker_invalid_port": "Número de port invàlid a l'adreça del broker.",
       "vin_required": "El VIN és obligatori.",
       "vin_invalid_length": "El VIN ha de tenir exactament 17 caràcters.",
       "vin_invalid_format": "El VIN conté caràcters no vàlids. Només es permeten lletres (excepte I, O, Q) i números."
     },
     "abort": {
-      "already_configured": "Aquest vehicle ja està configurat."
+      "already_configured": "Aquest vehicle ja està configurat.",
+      "mqtt_not_configured": "MQTT no està configurat a Home Assistant. Si us plau, configura MQTT primer."
     }
   },
   "options": {
@@ -44,15 +40,10 @@
         "title": "Opcions Tesla Fleet Telemetry",
         "description": "Actualitza la configuració de la integració. El VIN no es pot canviar.",
         "data": {
-          "kafka_broker": "Adreça del Broker Kafka",
-          "kafka_topic": "Topic Kafka",
+          "mqtt_topic_base": "Topic Base MQTT",
           "vehicle_name": "Nom del Vehicle"
         }
       }
-    },
-    "error": {
-      "broker_connection_failed": "No s'ha pogut connectar al broker Kafka.",
-      "broker_timeout": "S'ha esgotat el temps de connexió al broker Kafka."
     }
   }
 }

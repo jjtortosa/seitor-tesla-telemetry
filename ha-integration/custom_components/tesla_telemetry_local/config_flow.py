@@ -1,25 +1,22 @@
 """Config flow for Tesla Fleet Telemetry Local integration."""
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
-import socket
 from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
-    CONF_KAFKA_BROKER,
-    CONF_KAFKA_TOPIC,
+    CONF_MQTT_TOPIC_BASE,
     CONF_VEHICLE_NAME,
     CONF_VEHICLE_VIN,
-    DEFAULT_KAFKA_PORT,
-    DEFAULT_KAFKA_TOPIC,
+    DEFAULT_MQTT_TOPIC_BASE,
     DEFAULT_VEHICLE_NAME,
     DOMAIN,
     VIN_LENGTH,
@@ -43,41 +40,6 @@ def validate_vin(vin: str) -> str | None:
     return None
 
 
-async def test_kafka_connection(broker: str, timeout: float = 5.0) -> str | None:
-    """Test connection to Kafka broker. Returns error key or None if successful."""
-    try:
-        # Parse broker address
-        if ":" in broker:
-            host, port_str = broker.rsplit(":", 1)
-            try:
-                port = int(port_str)
-            except ValueError:
-                return "broker_invalid_port"
-        else:
-            host = broker
-            port = DEFAULT_KAFKA_PORT
-
-        # Test TCP connection
-        loop = asyncio.get_event_loop()
-        try:
-            await asyncio.wait_for(
-                loop.run_in_executor(
-                    None, lambda: socket.create_connection((host, port), timeout=timeout)
-                ),
-                timeout=timeout + 1,
-            )
-            return None  # Connection successful
-        except (socket.timeout, socket.error, OSError) as err:
-            _LOGGER.debug("Kafka connection test failed: %s", err)
-            return "broker_connection_failed"
-        except asyncio.TimeoutError:
-            return "broker_timeout"
-
-    except Exception as err:  # noqa: BLE001
-        _LOGGER.exception("Unexpected error testing Kafka connection: %s", err)
-        return "broker_connection_failed"
-
-
 class TeslaTelemetryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Tesla Fleet Telemetry Local."""
 
@@ -97,34 +59,33 @@ class TeslaTelemetryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the initial step - Kafka broker configuration."""
+        """Handle the initial step - MQTT configuration."""
         self._errors = {}
 
-        if user_input is not None:
-            broker = user_input[CONF_KAFKA_BROKER].strip()
+        # Check if MQTT is available
+        if not mqtt.async_get_instance(self.hass):
+            return self.async_abort(reason="mqtt_not_configured")
 
-            # Test Kafka connection
-            error = await test_kafka_connection(broker)
-            if error:
-                self._errors["base"] = error
-            else:
-                self._data[CONF_KAFKA_BROKER] = broker
-                self._data[CONF_KAFKA_TOPIC] = user_input.get(
-                    CONF_KAFKA_TOPIC, DEFAULT_KAFKA_TOPIC
-                ).strip()
-                return await self.async_step_vehicle()
+        if user_input is not None:
+            topic_base = user_input.get(
+                CONF_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE
+            ).strip().rstrip("/")
+
+            self._data[CONF_MQTT_TOPIC_BASE] = topic_base
+            return await self.async_step_vehicle()
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_KAFKA_BROKER): str,
-                    vol.Optional(CONF_KAFKA_TOPIC, default=DEFAULT_KAFKA_TOPIC): str,
+                    vol.Optional(
+                        CONF_MQTT_TOPIC_BASE, default=DEFAULT_MQTT_TOPIC_BASE
+                    ): str,
                 }
             ),
             errors=self._errors,
             description_placeholders={
-                "default_topic": DEFAULT_KAFKA_TOPIC,
+                "default_topic": DEFAULT_MQTT_TOPIC_BASE,
             },
         )
 
@@ -166,7 +127,7 @@ class TeslaTelemetryConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
             errors=self._errors,
             description_placeholders={
-                "broker": self._data.get(CONF_KAFKA_BROKER, ""),
+                "topic_base": self._data.get(CONF_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE),
             },
         )
 
@@ -185,41 +146,35 @@ class TeslaTelemetryOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            broker = user_input[CONF_KAFKA_BROKER].strip()
+            topic_base = user_input.get(
+                CONF_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE
+            ).strip().rstrip("/")
 
-            # Test Kafka connection if broker changed
-            if broker != self._config_entry.data.get(CONF_KAFKA_BROKER):
-                error = await test_kafka_connection(broker)
-                if error:
-                    errors["base"] = error
+            # Update the config entry
+            new_data = {
+                **self._config_entry.data,
+                CONF_MQTT_TOPIC_BASE: topic_base,
+                CONF_VEHICLE_NAME: user_input.get(
+                    CONF_VEHICLE_NAME, DEFAULT_VEHICLE_NAME
+                ).strip(),
+            }
+            self.hass.config_entries.async_update_entry(
+                self._config_entry, data=new_data
+            )
+            return self.async_create_entry(title="", data={})
 
-            if not errors:
-                # Update the config entry
-                new_data = {
-                    **self._config_entry.data,
-                    CONF_KAFKA_BROKER: broker,
-                    CONF_KAFKA_TOPIC: user_input.get(
-                        CONF_KAFKA_TOPIC, DEFAULT_KAFKA_TOPIC
-                    ).strip(),
-                    CONF_VEHICLE_NAME: user_input.get(
-                        CONF_VEHICLE_NAME, DEFAULT_VEHICLE_NAME
-                    ).strip(),
-                }
-                self.hass.config_entries.async_update_entry(
-                    self._config_entry, data=new_data
-                )
-                return self.async_create_entry(title="", data={})
-
-        current_broker = self._config_entry.data.get(CONF_KAFKA_BROKER, "")
-        current_topic = self._config_entry.data.get(CONF_KAFKA_TOPIC, DEFAULT_KAFKA_TOPIC)
-        current_name = self._config_entry.data.get(CONF_VEHICLE_NAME, DEFAULT_VEHICLE_NAME)
+        current_topic = self._config_entry.data.get(
+            CONF_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE
+        )
+        current_name = self._config_entry.data.get(
+            CONF_VEHICLE_NAME, DEFAULT_VEHICLE_NAME
+        )
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_KAFKA_BROKER, default=current_broker): str,
-                    vol.Optional(CONF_KAFKA_TOPIC, default=current_topic): str,
+                    vol.Optional(CONF_MQTT_TOPIC_BASE, default=current_topic): str,
                     vol.Optional(CONF_VEHICLE_NAME, default=current_name): str,
                 }
             ),
