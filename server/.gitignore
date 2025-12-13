@@ -1,0 +1,19 @@
+# Environment and config
+.env
+config.json
+
+# SSL Certificates
+certs/
+*.pem
+*.crt
+*.key
+
+# Tesla API Keys
+keys/
+
+# Logs
+logs/
+*.log
+
+# Docker data (shouldn't be here, but just in case)
+data/

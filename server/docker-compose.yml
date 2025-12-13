@@ -1,9 +1,18 @@
 version: '3.8'
 
+# Tesla Fleet Telemetry Server Stack
+#
+# Quick Start:
+#   1. Run ./setup.sh to configure
+#   2. Copy SSL certificates to certs/
+#   3. docker compose up -d
+#
+# Environment variables can be set in .env file (see .env.example)
+
 services:
   # Zookeeper - Required by Kafka
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
     restart: unless-stopped
     environment:
@@ -22,16 +31,20 @@ services:
 
   # Kafka - Message queue for telemetry data
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
     restart: unless-stopped
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      # Internal: for fleet-telemetry container
+      # External: for Home Assistant connection
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://${KAFKA_HOST:-localhost}:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -42,15 +55,15 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data
     ports:
-      - "9092:9092"      # Internal (Docker network)
-      - "29092:29092"    # External (localhost)
+      - "${KAFKA_PORT:-9092}:9092"
     networks:
       - tesla-net
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 30s
 
   # Tesla Fleet Telemetry Server
   fleet-telemetry:
@@ -62,31 +75,32 @@ services:
         condition: service_healthy
     ports:
       - "443:443"   # HTTPS for Tesla vehicle connections
-      - "8443:8443" # Metrics/health endpoint (optional)
+      - "8443:8443" # Metrics/health endpoint
     volumes:
       - ./config.json:/config.json:ro
-      - ./certs:/certs:ro
-      - ./keys:/keys:ro
-      - ./logs:/var/log/fleet-telemetry
+      - ${CERTS_PATH:-./certs}:/certs:ro
+      - ${KEYS_PATH:-./keys}:/keys:ro
+      - ${LOGS_PATH:-./logs}:/var/log/fleet-telemetry
     environment:
-      # Configuration file path
       CONFIG_FILE: /config.json
-      # Log level (debug, info, warn, error)
-      LOG_LEVEL: info
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     networks:
       - tesla-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8443/health"]
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:443/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
-  # Kafka UI (optional - for debugging)
+  # Kafka UI - Web interface for debugging (optional)
+  # Access at http://localhost:8080
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     restart: unless-stopped
+    profiles:
+      - debug  # Only starts with: docker compose --profile debug up
     depends_on:
       - kafka
     ports:
