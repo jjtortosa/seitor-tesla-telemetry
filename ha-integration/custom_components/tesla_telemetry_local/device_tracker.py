@@ -26,7 +26,7 @@ async def async_setup_entry(
     vehicle_name = data.vehicle_name
     vehicle_vin = data.vehicle_vin
     device_info = data.device_info
-    consumer = data.consumer
+    mqtt_client = data.mqtt_client
 
     _LOGGER.info("Setting up Tesla device tracker for %s", vehicle_name)
 
@@ -40,7 +40,7 @@ async def async_setup_entry(
     async_add_entities([tracker])
 
     # Register callback for location updates
-    consumer.register_callback("Location", tracker.update_location)
+    mqtt_client.register_callback("Location", tracker.update_location)
     _LOGGER.debug("Registered Location callback for device_tracker")
 
 

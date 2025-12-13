@@ -49,7 +49,7 @@ async def async_setup_entry(
     vehicle_name = data.vehicle_name
     vehicle_vin = data.vehicle_vin
     device_info = data.device_info
-    consumer = data.consumer
+    mqtt_client = data.mqtt_client
 
     _LOGGER.info("Setting up Tesla sensors for %s", vehicle_name)
 
@@ -72,9 +72,9 @@ async def async_setup_entry(
 
     async_add_entities(entities)
 
-    # Register callbacks with Kafka consumer
+    # Register callbacks with MQTT client
     for entity in entities:
-        consumer.register_callback(entity.field_name, entity.update_value)
+        mqtt_client.register_callback(entity.field_name, entity.update_value)
         _LOGGER.debug("Registered callback for field: %s", entity.field_name)
 
 

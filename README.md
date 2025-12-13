@@ -32,11 +32,12 @@ Self-hosted Tesla Fleet Telemetry server with custom Home Assistant integration 
 |-------------|------------|
 | Tesla Developer account (partner registration) | 🟡 Medium |
 | Public domain + Let's Encrypt SSL | 🟡 Medium |
-| Server running Docker + Kafka | 🔴 High |
+| Server running Docker + Fleet Telemetry | 🔴 High |
 | Public port 443 (port forwarding/DDNS) | 🔴 High |
 | EC key pair + virtual key pairing | 🔴 High |
 | OAuth flow + token management | 🟡 Medium |
 | Send telemetry config to vehicle | 🔴 High |
+| **MQTT broker in Home Assistant** | 🟢 Easy |
 
 ---
 
@@ -51,32 +52,36 @@ This project provides a complete solution for streaming Tesla vehicle data to Ho
 - **No monthly fees**: Free alternative to Teslemetry service
 - **Custom HA integration**: Native Home Assistant integration with device tracker and sensors
 - **Battery efficient**: No unnecessary vehicle wake-ups
-- **JSON format**: Uses `transmit_decoded_records: true` for easy debugging
+- **MQTT native**: Uses Home Assistant's built-in MQTT integration (v2.0+)
+- **JSON format**: Simple JSON messages, no Protobuf complexity
 
 ### Architecture
 
 ```
-Tesla Vehicle → Fleet Telemetry → Kafka → HA Integration → Home Assistant
-                (Proxmox VM)              (custom_component)
+Tesla Vehicle → Fleet Telemetry → MQTT → Home Assistant
+                (your server)      ↑      (custom_component)
+                                   |
+                              Mosquitto
+                            (HA add-on)
 ```
 
 ## Components
 
 ### 1. Server (`server/`)
-Docker-based Fleet Telemetry server with Kafka message queue.
+Docker-based Fleet Telemetry server with MQTT output.
 
-- **Technologies**: Docker, Kafka, Tesla Fleet Telemetry
+- **Technologies**: Docker, Tesla Fleet Telemetry, MQTT
 - **Requirements**: Public domain with valid SSL, port 443 exposed
-- **Resource usage**: 2 CPU cores, 4GB RAM, 20GB disk
-- **Data format**: JSON (not Protobuf) via `transmit_decoded_records: true`
+- **Resource usage**: 2 CPU cores, 2GB RAM, 10GB disk
+- **Data format**: JSON via MQTT topics
 
 ### 2. Home Assistant Integration (`ha-integration/`)
-Custom component that consumes Kafka messages and creates HA entities.
+Custom component that subscribes to MQTT and creates HA entities.
 
-- **Entities created**: `device_tracker`, sensors, binary_sensors
+- **Entities created**: `device_tracker`, sensors, binary_sensors (13 total)
 - **Real-time updates**: Location, speed, battery, charging, TPMS, temperature
-- **No polling required**: Push-based updates from Kafka
-- **JSON parsing**: Simplified parsing without Protobuf dependency
+- **No polling required**: Push-based updates via MQTT
+- **Dependency**: Requires MQTT integration configured in HA
 
 ### 3. Documentation (`docs/`)
 Complete setup guides from infrastructure to automation examples.
@@ -100,12 +105,12 @@ Complete setup guides from infrastructure to automation examples.
 - Docker host (Proxmox VM, dedicated server, etc.)
 - Domain name with DNS control
 - Tesla account with vehicle (firmware 2024.26+)
-- Home Assistant instance
+- Home Assistant instance with **MQTT configured** (Mosquitto add-on recommended)
 
 ### Setup Steps
 
 1. **Infrastructure Setup**
-   - Create VM/container for fleet-telemetry + Kafka
+   - Create VM/container for fleet-telemetry
    - Configure DNS: `tesla-telemetry.yourdomain.com` (direct A record, NOT proxied)
    - Generate Let's Encrypt SSL certificate
 
@@ -117,40 +122,73 @@ Complete setup guides from infrastructure to automation examples.
    - Pair virtual key with vehicle
 
 3. **Server Deployment**
-   - Deploy Fleet Telemetry + Kafka stack
-   - Configure `transmit_decoded_records: true` for JSON output
+   - Deploy Fleet Telemetry with **MQTT output**
+   - Configure to publish to your Mosquitto broker
    - Test vehicle connection
 
 4. **HA Integration**
+   - Install Mosquitto add-on in Home Assistant
+   - Configure MQTT integration
    - Copy `custom_components/tesla_telemetry_local/` to HA
-   - Configure in `configuration.yaml`
-   - Restart Home Assistant
+   - Add integration via UI: **Settings → Devices & Services → Add Integration**
+   - Search for "Tesla Fleet Telemetry Local"
 
 ## Configuration
 
-### Fleet Telemetry Server Config
+### Fleet Telemetry Server Config (MQTT)
 
 ```json
 {
   "host": "0.0.0.0",
   "port": 443,
   "log_level": "info",
-  "transmit_decoded_records": true,
-  "kafka": {
-    "bootstrap_servers": ["localhost:9092"],
-    "topic": "tesla_telemetry_V"
+  "mqtt": {
+    "broker": "192.168.5.201:1883",
+    "client_id": "fleet-telemetry",
+    "username": "mqtt_user",
+    "password": "mqtt_password",
+    "topic_base": "tesla",
+    "qos": 1,
+    "retained": true
+  },
+  "records": {
+    "V": ["mqtt"],
+    "alerts": ["mqtt"],
+    "errors": ["mqtt"]
+  },
+  "reliable_ack_sources": {
+    "V": "mqtt"
+  },
+  "tls": {
+    "server_cert": "/certs/fullchain.pem",
+    "server_key": "/certs/privkey.pem"
   }
 }
 ```
 
 ### Home Assistant Configuration
 
-```yaml
-tesla_telemetry_local:
-  kafka_broker: "192.168.5.204:29092"
-  kafka_topic: "tesla_telemetry_V"
-  vehicle_vin: "YOUR_VIN_HERE"
-  vehicle_name: "MelanY"
+**Via UI (recommended):**
+1. Go to **Settings → Devices & Services → Add Integration**
+2. Search for "Tesla Fleet Telemetry Local"
+3. Enter:
+   - **MQTT Topic Base**: `tesla` (must match server config)
+   - **Vehicle VIN**: Your 17-character VIN
+   - **Vehicle Name**: Friendly name (e.g., "MelanY")
+
+**Note:** MQTT broker configuration is handled by HA's MQTT integration.
+
+### MQTT Topic Structure
+
+Fleet Telemetry publishes to these topics:
+
+```
+tesla/<VIN>/v/VehicleSpeed      → {"value": 65}
+tesla/<VIN>/v/BatteryLevel      → {"value": 78}
+tesla/<VIN>/v/Location          → {"latitude": 41.38, "longitude": 2.17}
+tesla/<VIN>/v/ChargeState       → {"value": "Charging"}
+tesla/<VIN>/connectivity        → {"Status": "connected"}
+tesla/<VIN>/alerts/#            → Alert messages
 ```
 
 ### Telemetry Config (send to vehicle)
@@ -233,17 +271,39 @@ tesla_telemetry_local:
    - Verify virtual key is paired
    - Check telemetry config was sent successfully
 
-2. **Kafka connection errors**
-   - Verify Kafka is accessible from HA network
-   - Check firewall rules for port 29092
+2. **MQTT connection errors**
+   - Verify Mosquitto add-on is running
+   - Check MQTT integration is configured in HA
+   - Verify topic_base matches server config
 
-3. **device_tracker not updating**
-   - Integration uses `device_tracker.see` service
-   - Check HA logs for "Tesla device_tracker" messages
+3. **Integration shows "MQTT not configured"**
+   - Install Mosquitto broker add-on
+   - Configure MQTT integration in HA
+   - Restart Home Assistant
 
-4. **Certificate errors**
+4. **device_tracker not updating**
+   - Check Location field is configured in telemetry
+   - Verify MQTT messages arriving: `mosquitto_sub -t "tesla/#" -v`
+   - Check HA logs for errors
+
+5. **Certificate errors**
    - Must use Let's Encrypt or Tesla-trusted CA
    - Domain must NOT be behind Cloudflare proxy
+
+## Migration from v1.x (Kafka)
+
+If upgrading from the Kafka-based version:
+
+1. Remove old integration from HA
+2. Install Mosquitto add-on (if not already)
+3. Update Fleet Telemetry server config to use MQTT instead of Kafka
+4. Copy new integration files
+5. Add integration via UI
+
+**Breaking changes in v2.0:**
+- No longer requires `kafka-python` dependency
+- Configuration via UI instead of YAML
+- Requires MQTT integration in Home Assistant
 
 ## Support
 
@@ -266,10 +326,12 @@ MIT License - see [LICENSE](LICENSE) file
 
 ---
 
-**Status**: ✅ v1.0.0 - Production ready
+**Status**: ✅ v2.0.0 - MQTT Edition
 
+- ✅ Migrated from Kafka to MQTT (simpler setup)
+- ✅ Uses Home Assistant's native MQTT integration
+- ✅ Config Flow UI (no YAML required)
 - ✅ Real-world tested and working
-- ✅ JSON format (easier debugging than Protobuf)
+- ✅ JSON format (easier debugging)
 - ✅ device_tracker with zone triggers
-- ✅ 17 telemetry fields supported
-- ✅ Automation examples included
+- ✅ 13 entities per vehicle

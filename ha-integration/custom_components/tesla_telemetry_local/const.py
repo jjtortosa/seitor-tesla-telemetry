@@ -7,25 +7,16 @@ from homeassistant.const import Platform
 DOMAIN: Final = "tesla_telemetry_local"
 
 # Configuration keys
-CONF_KAFKA_BROKER: Final = "kafka_broker"
-CONF_KAFKA_TOPIC: Final = "kafka_topic"
+CONF_MQTT_TOPIC_BASE: Final = "mqtt_topic_base"
 CONF_VEHICLE_VIN: Final = "vehicle_vin"
 CONF_VEHICLE_NAME: Final = "vehicle_name"
 
 # Default values
-DEFAULT_KAFKA_TOPIC: Final = "tesla_telemetry"
+DEFAULT_MQTT_TOPIC_BASE: Final = "tesla"
 DEFAULT_VEHICLE_NAME: Final = "Tesla"
-DEFAULT_KAFKA_PORT: Final = 9092
 
 # Platforms
 PLATFORMS: Final = [Platform.DEVICE_TRACKER, Platform.SENSOR, Platform.BINARY_SENSOR]
-
-# Connection settings
-KAFKA_SESSION_TIMEOUT_MS: Final = 30000
-KAFKA_HEARTBEAT_INTERVAL_MS: Final = 10000
-KAFKA_CONSUMER_TIMEOUT_MS: Final = 1000
-KAFKA_MAX_RECONNECT_ATTEMPTS: Final = 10
-KAFKA_RECONNECT_BASE_DELAY: Final = 30
 
 # VIN validation
 VIN_LENGTH: Final = 17
