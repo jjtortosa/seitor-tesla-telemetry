@@ -1,33 +1,41 @@
 {
-  "host": "tesla-telemetry.seitor.com",
+  "host": "0.0.0.0",
   "port": 443,
   "log_level": "info",
   "json_log_enable": true,
-  "namespace": "tesla",
+  "namespace": "tesla_telemetry",
   "tls": {
     "server_cert": "/certs/fullchain.pem",
     "server_key": "/certs/privkey.pem"
   },
-  "kafka": {
-    "brokers": ["kafka:9092"],
-    "topic": "tesla_telemetry"
+  "mqtt": {
+    "broker": "192.168.6.41:1883",
+    "client_id": "fleet-telemetry",
+    "username": "",
+    "password": "",
+    "topic_base": "tesla",
+    "qos": 1,
+    "retained": true,
+    "connect_timeout_ms": 30000,
+    "publish_timeout_ms": 2500,
+    "keep_alive_seconds": 30
+  },
+  "records": {
+    "V": ["mqtt"],
+    "alerts": ["mqtt"],
+    "errors": ["mqtt"]
+  },
+  "reliable_ack": true,
+  "reliable_ack_sources": {
+    "V": "mqtt"
   },
   "rate_limit": {
     "enabled": true,
     "message_limit": 1000,
     "message_interval_time_seconds": 30
   },
-  "reliable_ack": true,
-  "reliable_ack_sources": {
-    "source_names": ["kafka"]
-  },
   "metrics": {
     "port": 8443,
-    "enabled": true,
-    "namespace": "tesla_telemetry"
-  },
-  "monitoring": {
-    "prometheus_metrics_port": 9090,
-    "profiler_port": 4269
+    "enabled": true
   }
 }

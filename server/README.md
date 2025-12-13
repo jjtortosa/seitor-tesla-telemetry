@@ -1,8 +1,15 @@
 # Fleet Telemetry Server
 
-Docker-based Tesla Fleet Telemetry server with Kafka message queue.
+Docker-based Tesla Fleet Telemetry server with MQTT output.
 
-## Quick Start (Recommended)
+## Architecture
+
+```
+Tesla Vehicle → Fleet Telemetry Server → MQTT Broker → Home Assistant
+               (this server, port 443)   (Mosquitto)   (integration)
+```
+
+## Quick Start
 
 ### 1. Run Interactive Setup
 
@@ -12,7 +19,7 @@ Docker-based Tesla Fleet Telemetry server with Kafka message queue.
 
 This will guide you through:
 - Domain configuration
-- Kafka network settings
+- MQTT broker settings
 - Tesla API key generation
 - All configuration file creation
 
@@ -53,13 +60,31 @@ cp config.json.example config.json
 # Edit both files with your settings
 ```
 
-### 2. Generate Keys
+### 2. Configure MQTT
+
+Edit `config.json` and set your MQTT broker:
+
+```json
+{
+  "mqtt": {
+    "broker": "192.168.5.201:1883",
+    "client_id": "fleet-telemetry",
+    "username": "your_mqtt_user",
+    "password": "your_mqtt_password",
+    "topic_base": "tesla",
+    "qos": 1,
+    "retained": true
+  }
+}
+```
+
+### 3. Generate Keys
 
 ```bash
 ./scripts/generate_keys.sh
 ```
 
-### 3. Prepare SSL Certificates
+### 4. Prepare SSL Certificates
 
 ```bash
 mkdir -p certs
@@ -70,18 +95,10 @@ chmod 644 certs/fullchain.pem
 chmod 600 certs/privkey.pem
 ```
 
-### 4. Start Services
+### 5. Start Services
 
 ```bash
 docker compose up -d
-```
-
-### 5. Access Kafka UI (optional)
-
-```bash
-# Start with debug profile
-docker compose --profile debug up -d
-# Open http://localhost:8080
 ```
 
 ## Directory Structure
@@ -110,61 +127,70 @@ server/
 ## Services
 
 ### fleet-telemetry
-- **Port**: 443 (HTTPS)
-- **Purpose**: Receives telemetry data from Tesla vehicles
-- **Healthcheck**: http://localhost:8443/health
+- **Port**: 443 (HTTPS for Tesla vehicles)
+- **Port**: 8443 (Metrics/health endpoint)
+- **Purpose**: Receives telemetry data from Tesla vehicles, publishes to MQTT
+- **Healthcheck**: `curl -k https://localhost:443/health`
 
-### kafka
-- **Port**: 9092 (internal), 29092 (external)
-- **Purpose**: Message queue for telemetry data
-- **Topics**: `tesla_telemetry` (auto-created)
+## MQTT Topic Structure
 
-### zookeeper
-- **Port**: 2181
-- **Purpose**: Kafka coordination service
+Fleet Telemetry publishes to these topics:
 
-### kafka-ui (optional)
-- **Port**: 8080
-- **Purpose**: Web UI for monitoring Kafka
+```
+tesla/<VIN>/v/<field_name>     # Telemetry metrics
+tesla/<VIN>/connectivity       # Vehicle connection status
+tesla/<VIN>/alerts/<name>      # Vehicle alerts
+tesla/<VIN>/errors/<name>      # Error messages
+```
+
+### Example Messages
+
+```bash
+# Battery level
+tesla/LRWYGCFS3RC210528/v/BatteryLevel → {"value": 72}
+
+# Location
+tesla/LRWYGCFS3RC210528/v/Location → {"latitude": 41.38, "longitude": 2.17}
+
+# Speed
+tesla/LRWYGCFS3RC210528/v/VehicleSpeed → {"value": 65}
+
+# Connectivity
+tesla/LRWYGCFS3RC210528/connectivity → {"status": "online"}
+```
 
 ## Useful Commands
 
 ### Start/Stop
 
 ```bash
-# Start all services
+# Start services
 docker compose up -d
 
-# Stop all services
+# Stop services
 docker compose down
 
-# Restart specific service
+# Restart
 docker compose restart fleet-telemetry
 
 # View logs
-docker compose logs -f
-
-# View logs for specific service
 docker compose logs -f fleet-telemetry
 ```
 
 ### Debugging
 
 ```bash
-# Check Kafka topics
-docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
+# Check fleet-telemetry health
+curl -k https://localhost:443/health
 
-# Consume messages from topic
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server localhost:9092 \
-  --topic tesla_telemetry \
-  --from-beginning
-
-# Check fleet-telemetry metrics
+# Check metrics
 curl http://localhost:8443/metrics
 
-# Check health
-curl http://localhost:8443/health
+# Monitor MQTT messages (from HA or MQTT broker)
+mosquitto_sub -h 192.168.5.201 -u mqtt_user -P mqtt_pass -t "tesla/#" -v
+
+# Check container status
+docker compose ps
 ```
 
 ### Maintenance
@@ -174,22 +200,37 @@ curl http://localhost:8443/health
 docker compose pull
 docker compose up -d
 
-# Clean up old data
-docker compose down -v  # ⚠️ Deletes volumes (Kafka data)
-
-# Backup Kafka data
-docker run --rm -v server_kafka-data:/data -v $(pwd):/backup ubuntu tar czf /backup/kafka-backup.tar.gz /data
+# View resource usage
+docker stats fleet-telemetry
 ```
 
 ## Configuration
 
-Edit `config.json` to customize:
+### config.json
 
-- **host**: Your domain (tesla-telemetry.seitor.com)
-- **tls**: Path to SSL certificates
-- **kafka.brokers**: Kafka broker addresses
-- **rate_limit**: Message rate limiting
-- **log_level**: debug, info, warn, error
+| Field | Description |
+|-------|-------------|
+| `host` | Bind address (0.0.0.0) |
+| `port` | HTTPS port (443) |
+| `tls.server_cert` | Path to SSL certificate |
+| `tls.server_key` | Path to SSL private key |
+| `mqtt.broker` | MQTT broker host:port |
+| `mqtt.topic_base` | Base topic for messages |
+| `mqtt.qos` | Quality of Service (0, 1, 2) |
+| `mqtt.retained` | Retain messages on broker |
+| `records` | Which record types to send to mqtt |
+
+### .env
+
+| Variable | Description |
+|----------|-------------|
+| `TELEMETRY_DOMAIN` | Your public domain |
+| `MQTT_HOST` | MQTT broker IP |
+| `MQTT_PORT` | MQTT broker port (1883) |
+| `MQTT_USERNAME` | MQTT authentication user |
+| `MQTT_PASSWORD` | MQTT authentication password |
+| `MQTT_TOPIC_BASE` | Base topic (default: tesla) |
+| `LOG_LEVEL` | Logging level |
 
 ## Troubleshooting
 
@@ -211,22 +252,21 @@ docker compose logs fleet-telemetry
 # Validate certificate
 ./scripts/validate_cert.sh tesla-telemetry.seitor.com
 
-# Regenerate Let's Encrypt cert
-certbot renew --force-renewal
+# Check certificate dates
+openssl x509 -in certs/fullchain.pem -noout -dates
 ```
 
-### Kafka not receiving messages
+### MQTT not receiving messages
 
 ```bash
-# Check if fleet-telemetry is running
-docker compose ps
+# Check fleet-telemetry logs
+docker compose logs fleet-telemetry | grep -i mqtt
 
-# Check fleet-telemetry logs for connection errors
-docker compose logs fleet-telemetry | grep -i error
+# Verify MQTT broker is reachable
+nc -zv 192.168.5.201 1883
 
-# Verify Kafka is healthy
-docker compose ps kafka
-docker exec -it kafka kafka-broker-api-versions --bootstrap-server localhost:9092
+# Test MQTT publish manually
+mosquitto_pub -h 192.168.5.201 -u user -P pass -t "test" -m "hello"
 ```
 
 ### Vehicle not connecting
@@ -242,6 +282,17 @@ docker exec -it kafka kafka-broker-api-versions --bootstrap-server localhost:909
    # From outside network
    nc -zv tesla-telemetry.seitor.com 443
    ```
+
+## Migration from Kafka (v1.x)
+
+If upgrading from the Kafka-based version:
+
+1. Stop current stack: `docker compose down`
+2. Update config files (see examples above)
+3. Remove Kafka volumes: `docker volume rm server_kafka-data server_zookeeper-data`
+4. Start new stack: `docker compose up -d`
+
+**Note**: No data migration needed - telemetry is real-time streaming.
 
 ## Next Steps
 
