@@ -8,12 +8,12 @@
           "mqtt_topic_base": "Topic Base MQTT"
         },
         "data_description": {
-          "mqtt_topic_base": "Topic base utilitzat per Fleet Telemetry (p.ex., 'tesla'). Els missatges es rebran de {topic_base}/{VIN}/v/#"
+          "mqtt_topic_base": "Topic base utilitzat per Fleet Telemetry (p.ex., 'tesla'). Els missatges es rebran de tesla/VIN/v/#"
         }
       },
       "vehicle": {
         "title": "Configuració del Vehicle",
-        "description": "Configura el teu vehicle Tesla.\n\nTopic: {topic_base}/{VIN}/v/#",
+        "description": "Configura el teu vehicle Tesla.",
         "data": {
           "vehicle_vin": "VIN del Vehicle",
           "vehicle_name": "Nom del Vehicle"

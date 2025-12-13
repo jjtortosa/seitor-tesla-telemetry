@@ -7,7 +7,6 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
@@ -62,8 +61,12 @@ class TeslaTelemetryConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle the initial step - MQTT configuration."""
         self._errors = {}
 
-        # Check if MQTT is available
-        if not mqtt.async_get_instance(self.hass):
+        # Check if MQTT is configured
+        mqtt_entries = [
+            entry for entry in self.hass.config_entries.async_entries()
+            if entry.domain == "mqtt"
+        ]
+        if not mqtt_entries:
             return self.async_abort(reason="mqtt_not_configured")
 
         if user_input is not None:
