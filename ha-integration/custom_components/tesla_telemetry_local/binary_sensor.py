@@ -12,7 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import TeslaTelemetryConfigEntry
+# Using ConfigEntry directly
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ BINARY_SENSOR_DEFINITIONS: list[tuple[str, str, BinarySensorDeviceClass, str, st
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: TeslaTelemetryConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Tesla binary sensors from a config entry."""

@@ -26,8 +26,6 @@ from .mqtt_client import TeslaMQTTClient
 
 _LOGGER = logging.getLogger(__name__)
 
-type TeslaTelemetryConfigEntry = ConfigEntry[TeslaTelemetryData]
-
 
 class TeslaTelemetryData:
     """Runtime data for Tesla Telemetry integration."""
@@ -47,7 +45,7 @@ class TeslaTelemetryData:
         self.entities: dict[str, Any] = {}
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: TeslaTelemetryConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tesla Telemetry Local from a config entry."""
     topic_base = entry.data.get(CONF_MQTT_TOPIC_BASE, DEFAULT_MQTT_TOPIC_BASE)
     vehicle_vin = entry.data[CONF_VEHICLE_VIN]
@@ -106,7 +104,7 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: TeslaTelemetryConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     # Stop MQTT client
     if entry.runtime_data and entry.runtime_data.mqtt_client:
@@ -116,7 +114,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: TeslaTelemetryConfigEnt
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-async def async_remove_entry(hass: HomeAssistant, entry: TeslaTelemetryConfigEntry) -> None:
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle removal of an entry."""
     # Clean up any resources
     if entry.runtime_data and entry.runtime_data.mqtt_client:

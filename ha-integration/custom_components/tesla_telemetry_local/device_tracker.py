@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import TeslaTelemetryConfigEntry
+# Using ConfigEntry directly
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: TeslaTelemetryConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Tesla device tracker from a config entry."""
