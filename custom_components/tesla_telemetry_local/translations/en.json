@@ -145,7 +145,13 @@
       "charging_state": { "name": "Charging State" },
       "charger_voltage": { "name": "Charger Voltage" },
       "charger_current": { "name": "Charger Current" },
-      "odometer": { "name": "Odometer" }
+      "odometer": { "name": "Odometer" },
+      "inside_temp": { "name": "Inside Temperature" },
+      "outside_temp": { "name": "Outside Temperature" },
+      "tpms_front_left": { "name": "Tire Pressure Front Left" },
+      "tpms_front_right": { "name": "Tire Pressure Front Right" },
+      "tpms_rear_left": { "name": "Tire Pressure Rear Left" },
+      "tpms_rear_right": { "name": "Tire Pressure Rear Right" }
     }
   }
 }

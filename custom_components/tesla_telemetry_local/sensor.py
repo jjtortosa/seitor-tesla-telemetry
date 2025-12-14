@@ -15,7 +15,9 @@ from homeassistant.const import (
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfLength,
+    UnitOfPressure,
     UnitOfSpeed,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -28,6 +30,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Sensor definitions: (key, name, field_name, unit, device_class, icon, state_class)
 SENSOR_DEFINITIONS: list[tuple[str, str, str, str | None, SensorDeviceClass | None, str | None, SensorStateClass | None]] = [
+    # Basic sensors
     ("speed", "Speed", "VehicleSpeed", UnitOfSpeed.KILOMETERS_PER_HOUR, None, "mdi:speedometer", SensorStateClass.MEASUREMENT),
     ("shift_state", "Shift State", "Gear", None, None, "mdi:car-shift-pattern", None),
     ("battery", "Battery", "Soc", PERCENTAGE, SensorDeviceClass.BATTERY, None, SensorStateClass.MEASUREMENT),
@@ -36,6 +39,14 @@ SENSOR_DEFINITIONS: list[tuple[str, str, str, str | None, SensorDeviceClass | No
     ("charger_voltage", "Charger Voltage", "ChargerVoltage", UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, None, SensorStateClass.MEASUREMENT),
     ("charger_current", "Charger Current", "ChargerActualCurrent", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT, None, SensorStateClass.MEASUREMENT),
     ("odometer", "Odometer", "Odometer", UnitOfLength.KILOMETERS, None, "mdi:counter", SensorStateClass.TOTAL_INCREASING),
+    # Temperature sensors
+    ("inside_temp", "Inside Temperature", "InsideTemp", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE, "mdi:thermometer", SensorStateClass.MEASUREMENT),
+    ("outside_temp", "Outside Temperature", "OutsideTemp", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE, "mdi:thermometer", SensorStateClass.MEASUREMENT),
+    # TPMS sensors (Tire Pressure Monitoring System)
+    ("tpms_front_left", "Tire Pressure Front Left", "TpmsPressureFl", UnitOfPressure.BAR, SensorDeviceClass.PRESSURE, "mdi:car-tire-alert", SensorStateClass.MEASUREMENT),
+    ("tpms_front_right", "Tire Pressure Front Right", "TpmsPressureFr", UnitOfPressure.BAR, SensorDeviceClass.PRESSURE, "mdi:car-tire-alert", SensorStateClass.MEASUREMENT),
+    ("tpms_rear_left", "Tire Pressure Rear Left", "TpmsPressureRl", UnitOfPressure.BAR, SensorDeviceClass.PRESSURE, "mdi:car-tire-alert", SensorStateClass.MEASUREMENT),
+    ("tpms_rear_right", "Tire Pressure Rear Right", "TpmsPressureRr", UnitOfPressure.BAR, SensorDeviceClass.PRESSURE, "mdi:car-tire-alert", SensorStateClass.MEASUREMENT),
 ]
 
 
@@ -159,6 +170,13 @@ class TeslaSensor(SensorEntity):
 
             elif self._field_name == "Odometer":
                 self._state = round(float(value), 1) if value is not None else None
+
+            elif self._field_name in ["InsideTemp", "OutsideTemp"]:
+                self._state = round(float(value), 1) if value is not None else None
+
+            elif self._field_name.startswith("TpmsPressure"):
+                # TPMS values come in bar
+                self._state = round(float(value), 2) if value is not None else None
 
             else:
                 self._state = value

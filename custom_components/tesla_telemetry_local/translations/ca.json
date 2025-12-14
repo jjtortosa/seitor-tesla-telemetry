@@ -148,7 +148,13 @@
       "charging_state": { "name": "Estat de Càrrega" },
       "charger_voltage": { "name": "Voltatge Carregador" },
       "charger_current": { "name": "Corrent Carregador" },
-      "odometer": { "name": "Quilometratge" }
+      "odometer": { "name": "Quilometratge" },
+      "inside_temp": { "name": "Temperatura Interior" },
+      "outside_temp": { "name": "Temperatura Exterior" },
+      "tpms_front_left": { "name": "Pressió Roda Davant Esquerra" },
+      "tpms_front_right": { "name": "Pressió Roda Davant Dreta" },
+      "tpms_rear_left": { "name": "Pressió Roda Darrere Esquerra" },
+      "tpms_rear_right": { "name": "Pressió Roda Darrere Dreta" }
     }
   }
 }

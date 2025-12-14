@@ -80,12 +80,12 @@ Docker-based Fleet Telemetry server with MQTT output.
 - **Resource usage**: 2 CPU cores, 2GB RAM, 10GB disk
 - **Data format**: JSON via MQTT topics
 
-### 2. Home Assistant Integration (`ha-integration/`)
+### 2. Home Assistant Integration (`custom_components/`)
 Custom component that subscribes to MQTT and creates HA entities.
 
-- **Entities created**: 25 entities per vehicle
+- **Entities created**: 31 entities per vehicle
   - `device_tracker` (1): Real-time GPS location
-  - `sensor` (8): Speed, shift state, battery, range, charging state, charger voltage/current, odometer
+  - `sensor` (14): Speed, shift state, battery, range, charging state, charger voltage/current, odometer, inside/outside temp, 4x tire pressure
   - `binary_sensor` (4): Awake, driving, charging, charge port open
   - `button` (7): Wake up, flash lights, honk horn, open frunk/trunk, open/close charge port
   - `switch` (4): Sentry mode, climate, charging, lock
@@ -94,6 +94,7 @@ Custom component that subscribes to MQTT and creates HA entities.
 - **Vehicle controls**: Lock, climate, charging, sentry mode via Tesla Fleet API
 - **No polling required**: Push-based updates via MQTT
 - **Dependency**: Requires MQTT integration configured in HA
+- **HACS compatible**: Easy installation via HACS custom repository
 
 ### 3. Documentation (`docs/`)
 Complete setup guides from infrastructure to automation examples.
@@ -266,6 +267,111 @@ tesla/<VIN>/alerts/#            → Alert messages
         message: "Battery at {{ states('sensor.tesla_battery') }}%"
 ```
 
+### Pre-condition on Cold Mornings
+
+```yaml
+- id: 'tesla_precondition_cold'
+  alias: Tesla precondition when cold
+  triggers:
+    - trigger: time
+      at: '07:30:00'
+  conditions:
+    - condition: numeric_state
+      entity_id: sensor.tesla_outside_temp
+      below: 5
+    - condition: state
+      entity_id: binary_sensor.workday_sensor
+      state: 'on'
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.tesla_climate
+    - action: notify.mobile_app
+      data:
+        title: "Tesla"
+        message: "Pre-conditioning started ({{ states('sensor.tesla_outside_temp') }}°C outside)"
+```
+
+### Charging Complete Alert
+
+```yaml
+- id: 'tesla_charging_complete'
+  alias: Tesla charging complete
+  triggers:
+    - entity_id: binary_sensor.tesla_charging
+      from: 'on'
+      to: 'off'
+      trigger: state
+  conditions:
+    - condition: numeric_state
+      entity_id: sensor.tesla_battery
+      above: 79
+  actions:
+    - action: notify.mobile_app
+      data:
+        title: "Tesla Charged"
+        message: "Charging complete at {{ states('sensor.tesla_battery') }}%"
+```
+
+### Low Tire Pressure Warning
+
+```yaml
+- id: 'tesla_tire_pressure_low'
+  alias: Tesla low tire pressure
+  triggers:
+    - entity_id: sensor.tesla_tpms_front_left
+      below: 2.5
+      trigger: numeric_state
+    - entity_id: sensor.tesla_tpms_front_right
+      below: 2.5
+      trigger: numeric_state
+    - entity_id: sensor.tesla_tpms_rear_left
+      below: 2.5
+      trigger: numeric_state
+    - entity_id: sensor.tesla_tpms_rear_right
+      below: 2.5
+      trigger: numeric_state
+  actions:
+    - action: notify.mobile_app
+      data:
+        title: "Tesla Tire Pressure"
+        message: "Low tire pressure detected. Check tires."
+```
+
+### Auto Lock When Leaving Home
+
+```yaml
+- id: 'tesla_auto_lock'
+  alias: Tesla auto lock when leaving
+  triggers:
+    - entity_id: device_tracker.tesla_YOUR_VIN
+      zone: zone.home
+      event: leave
+      trigger: zone
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.tesla_locked
+```
+
+### Sentry Mode at Night
+
+```yaml
+- id: 'tesla_sentry_night'
+  alias: Tesla sentry mode at night
+  triggers:
+    - trigger: time
+      at: '22:00:00'
+  conditions:
+    - condition: state
+      entity_id: device_tracker.tesla_YOUR_VIN
+      state: 'home'
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.tesla_sentry_mode
+```
+
 ## Cost Comparison
 
 | Solution | Monthly Cost | Latency | Setup Time | Control |
@@ -323,14 +429,14 @@ MIT License - see [LICENSE](LICENSE) file
 
 ---
 
-**Status**: ✅ v2.1.0 - Production Ready
+**Status**: ✅ v2.2.0 - Production Ready
 
 - ✅ Uses Home Assistant's native MQTT integration
 - ✅ Config Flow UI (no YAML required)
 - ✅ Real-world tested and working
 - ✅ JSON format (easy debugging)
 - ✅ device_tracker with zone triggers
-- ✅ 25 entities per vehicle (sensors, controls, buttons)
+- ✅ 31 entities per vehicle (sensors, controls, buttons)
 - ✅ Vehicle controls via Tesla Fleet API (lock, climate, charging, sentry)
 - ✅ Telemetry configuration UI (presets + custom intervals)
 - ✅ Multi-language support (EN, ES, CA)

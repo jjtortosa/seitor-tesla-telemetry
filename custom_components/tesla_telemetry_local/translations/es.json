@@ -148,7 +148,13 @@
       "charging_state": { "name": "Estado de Carga" },
       "charger_voltage": { "name": "Voltaje Cargador" },
       "charger_current": { "name": "Corriente Cargador" },
-      "odometer": { "name": "Kilometraje" }
+      "odometer": { "name": "Kilometraje" },
+      "inside_temp": { "name": "Temperatura Interior" },
+      "outside_temp": { "name": "Temperatura Exterior" },
+      "tpms_front_left": { "name": "Presión Rueda Delantera Izquierda" },
+      "tpms_front_right": { "name": "Presión Rueda Delantera Derecha" },
+      "tpms_rear_left": { "name": "Presión Rueda Trasera Izquierda" },
+      "tpms_rear_right": { "name": "Presión Rueda Trasera Derecha" }
     }
   }
 }
