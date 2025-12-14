@@ -114,5 +114,41 @@
         "custom": "Personalizado - Configura individualmente"
       }
     }
+  },
+  "entity": {
+    "button": {
+      "wake_up": { "name": "Despertar" },
+      "flash_lights": { "name": "Hacer Parpadear Luces" },
+      "honk_horn": { "name": "Tocar Claxon" },
+      "open_frunk": { "name": "Abrir Frunk" },
+      "open_trunk": { "name": "Abrir Maletero" },
+      "open_charge_port": { "name": "Abrir Puerto de Carga" },
+      "close_charge_port": { "name": "Cerrar Puerto de Carga" }
+    },
+    "switch": {
+      "sentry_mode": { "name": "Modo Centinela" },
+      "climate": { "name": "Climatización" },
+      "charging": { "name": "Carga" },
+      "locked": { "name": "Bloqueo" }
+    },
+    "number": {
+      "charge_limit": { "name": "Límite de Carga" }
+    },
+    "binary_sensor": {
+      "awake": { "name": "Despierto" },
+      "driving": { "name": "Conduciendo" },
+      "charging": { "name": "Cargando" },
+      "charge_port_open": { "name": "Puerto de Carga" }
+    },
+    "sensor": {
+      "speed": { "name": "Velocidad" },
+      "shift_state": { "name": "Marchas" },
+      "battery": { "name": "Batería" },
+      "range": { "name": "Autonomía" },
+      "charging_state": { "name": "Estado de Carga" },
+      "charger_voltage": { "name": "Voltaje Cargador" },
+      "charger_current": { "name": "Corriente Cargador" },
+      "odometer": { "name": "Kilometraje" }
+    }
   }
 }

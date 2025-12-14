@@ -53,10 +53,12 @@ This project provides a complete solution for streaming Tesla vehicle data to Ho
 - **Real-time streaming**: <1 second latency for location, shift state, speed, and more
 - **Self-hosted**: Full control over your data and infrastructure
 - **No monthly fees**: Free alternative to Teslemetry service
-- **Custom HA integration**: Native Home Assistant integration with device tracker and sensors
+- **Custom HA integration**: Native Home Assistant integration with device tracker, sensors, and controls
+- **Vehicle controls**: Lock, climate, charging, sentry mode, frunk/trunk, charge port
 - **Battery efficient**: No unnecessary vehicle wake-ups
 - **MQTT native**: Uses Home Assistant's built-in MQTT integration (v2.0+)
 - **JSON format**: Simple JSON messages, no Protobuf complexity
+- **Multi-language**: English, Spanish, and Catalan translations
 
 ### Architecture
 
@@ -81,8 +83,15 @@ Docker-based Fleet Telemetry server with MQTT output.
 ### 2. Home Assistant Integration (`ha-integration/`)
 Custom component that subscribes to MQTT and creates HA entities.
 
-- **Entities created**: `device_tracker`, sensors, binary_sensors (13 total)
+- **Entities created**: 25 entities per vehicle
+  - `device_tracker` (1): Real-time GPS location
+  - `sensor` (8): Speed, shift state, battery, range, charging state, charger voltage/current, odometer
+  - `binary_sensor` (4): Awake, driving, charging, charge port open
+  - `button` (7): Wake up, flash lights, honk horn, open frunk/trunk, open/close charge port
+  - `switch` (4): Sentry mode, climate, charging, lock
+  - `number` (1): Charge limit (50-100%)
 - **Real-time updates**: Location, speed, battery, charging, TPMS, temperature
+- **Vehicle controls**: Lock, climate, charging, sentry mode via Tesla Fleet API
 - **No polling required**: Push-based updates via MQTT
 - **Dependency**: Requires MQTT integration configured in HA
 
@@ -314,11 +323,14 @@ MIT License - see [LICENSE](LICENSE) file
 
 ---
 
-**Status**: ✅ v2.0.0 - Production Ready
+**Status**: ✅ v2.1.0 - Production Ready
 
 - ✅ Uses Home Assistant's native MQTT integration
 - ✅ Config Flow UI (no YAML required)
 - ✅ Real-world tested and working
 - ✅ JSON format (easy debugging)
 - ✅ device_tracker with zone triggers
-- ✅ 13 entities per vehicle
+- ✅ 25 entities per vehicle (sensors, controls, buttons)
+- ✅ Vehicle controls via Tesla Fleet API (lock, climate, charging, sentry)
+- ✅ Telemetry configuration UI (presets + custom intervals)
+- ✅ Multi-language support (EN, ES, CA)

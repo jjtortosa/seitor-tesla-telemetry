@@ -111,5 +111,41 @@
         "custom": "Custom - Configure individually"
       }
     }
+  },
+  "entity": {
+    "button": {
+      "wake_up": { "name": "Wake Up" },
+      "flash_lights": { "name": "Flash Lights" },
+      "honk_horn": { "name": "Honk Horn" },
+      "open_frunk": { "name": "Open Frunk" },
+      "open_trunk": { "name": "Open Trunk" },
+      "open_charge_port": { "name": "Open Charge Port" },
+      "close_charge_port": { "name": "Close Charge Port" }
+    },
+    "switch": {
+      "sentry_mode": { "name": "Sentry Mode" },
+      "climate": { "name": "Climate" },
+      "charging": { "name": "Charging" },
+      "locked": { "name": "Lock" }
+    },
+    "number": {
+      "charge_limit": { "name": "Charge Limit" }
+    },
+    "binary_sensor": {
+      "awake": { "name": "Awake" },
+      "driving": { "name": "Driving" },
+      "charging": { "name": "Charging" },
+      "charge_port_open": { "name": "Charge Port" }
+    },
+    "sensor": {
+      "speed": { "name": "Speed" },
+      "shift_state": { "name": "Shift State" },
+      "battery": { "name": "Battery" },
+      "range": { "name": "Range" },
+      "charging_state": { "name": "Charging State" },
+      "charger_voltage": { "name": "Charger Voltage" },
+      "charger_current": { "name": "Charger Current" },
+      "odometer": { "name": "Odometer" }
+    }
   }
 }
