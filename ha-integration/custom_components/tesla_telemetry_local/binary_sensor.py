@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
@@ -11,11 +12,14 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 
-# Using ConfigEntry directly
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# Timeout for considering vehicle asleep (no telemetry received)
+AWAKE_TIMEOUT_MINUTES = 5
 
 
 # Binary sensor definitions: (key, name, device_class, icon_on, icon_off, depends_on)
@@ -23,7 +27,7 @@ BINARY_SENSOR_DEFINITIONS: list[tuple[str, str, BinarySensorDeviceClass, str, st
     ("driving", "Driving", BinarySensorDeviceClass.MOVING, "mdi:car-speed-limiter", "mdi:car-parking", ["Gear", "VehicleSpeed"]),
     ("charging", "Charging", BinarySensorDeviceClass.BATTERY_CHARGING, "mdi:battery-charging", "mdi:battery", ["ChargingState", "ChargeState"]),
     ("charge_port_open", "Charge Port", BinarySensorDeviceClass.DOOR, "mdi:ev-plug-type2", "mdi:ev-plug-type2", ["ChargePortDoorOpen"]),
-    ("connected", "Connected", BinarySensorDeviceClass.CONNECTIVITY, "mdi:wifi", "mdi:wifi-off", []),
+    ("awake", "Awake", BinarySensorDeviceClass.CONNECTIVITY, "mdi:sleep-off", "mdi:sleep", []),
 ]
 
 
@@ -43,8 +47,11 @@ async def async_setup_entry(
 
     # Create binary sensor entities
     entities: list[TeslaBinarySensor] = []
+    awake_entity: TeslaBinarySensor | None = None
+
     for key, name, device_class, icon_on, icon_off, depends_on in BINARY_SENSOR_DEFINITIONS:
         entity = TeslaBinarySensor(
+            hass=hass,
             vehicle_name=vehicle_name,
             vehicle_vin=vehicle_vin,
             device_info=device_info,
@@ -56,6 +63,8 @@ async def async_setup_entry(
             depends_on=depends_on,
         )
         entities.append(entity)
+        if key == "awake":
+            awake_entity = entity
 
     async_add_entities(entities)
 
@@ -63,9 +72,20 @@ async def async_setup_entry(
     for entity in entities:
         for field in entity.depends_on:
             mqtt_client.register_callback(field, entity.update_value)
-        # Also register for connectivity updates
-        if entity._sensor_key == "connected":
-            mqtt_client.register_callback("connectivity", entity.update_value)
+        # Register awake sensor for any telemetry data
+        if entity._sensor_key == "awake":
+            mqtt_client.register_callback("any", entity.update_value)
+
+    # Set up periodic check for awake timeout
+    if awake_entity:
+        async def check_awake_timeout(now: datetime) -> None:
+            """Check if vehicle should be marked as asleep."""
+            awake_entity.check_timeout()
+
+        # Check every minute
+        entry.async_on_unload(
+            async_track_time_interval(hass, check_awake_timeout, timedelta(minutes=1))
+        )
 
 
 class TeslaBinarySensor(BinarySensorEntity):
@@ -75,6 +95,7 @@ class TeslaBinarySensor(BinarySensorEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         vehicle_name: str,
         vehicle_vin: str,
         device_info: dict[str, Any],
@@ -86,6 +107,7 @@ class TeslaBinarySensor(BinarySensorEntity):
         depends_on: list[str],
     ) -> None:
         """Initialize the binary sensor."""
+        self._hass = hass
         self._vehicle_name = vehicle_name
         self._vehicle_vin = vehicle_vin
         self._sensor_key = sensor_key
@@ -95,6 +117,7 @@ class TeslaBinarySensor(BinarySensorEntity):
         self._state: bool = False
         self._data_cache: dict[str, Any] = {}
         self._last_updated: str | None = None
+        self._last_message_time: datetime | None = None
 
         # Entity properties
         self._attr_unique_id = f"{vehicle_vin}_{sensor_key}"
@@ -149,8 +172,10 @@ class TeslaBinarySensor(BinarySensorEntity):
             elif self._sensor_key == "charge_port_open":
                 self._state = self._calculate_charge_port_state()
 
-            elif self._sensor_key == "connected":
-                self._state = True  # If we receive any data, we're connected
+            elif self._sensor_key == "awake":
+                # If we receive any data, vehicle is awake
+                self._state = True
+                self._last_message_time = datetime.now()
 
             self._last_updated = data.get("timestamp")
 
@@ -165,6 +190,30 @@ class TeslaBinarySensor(BinarySensorEntity):
 
         except Exception as err:  # noqa: BLE001
             _LOGGER.error("Error updating binary sensor %s: %s", self._attr_name, err)
+
+    @callback
+    def check_timeout(self) -> None:
+        """Check if awake sensor should timeout to asleep."""
+        if self._sensor_key != "awake":
+            return
+
+        if self._last_message_time is None:
+            # No message ever received
+            if self._state:
+                self._state = False
+                self.async_write_ha_state()
+            return
+
+        time_since_last = datetime.now() - self._last_message_time
+        if time_since_last > timedelta(minutes=AWAKE_TIMEOUT_MINUTES):
+            if self._state:
+                _LOGGER.debug(
+                    "Vehicle %s marked as asleep (no data for %s minutes)",
+                    self._vehicle_name,
+                    AWAKE_TIMEOUT_MINUTES,
+                )
+                self._state = False
+                self.async_write_ha_state()
 
     def _calculate_driving_state(self) -> bool:
         """Calculate if vehicle is driving."""
@@ -227,16 +276,18 @@ class TeslaBinarySensor(BinarySensorEntity):
         elif self._sensor_key == "charge_port_open":
             return "Port door sensor"
 
-        elif self._sensor_key == "connected":
-            return "Telemetry stream"
+        elif self._sensor_key == "awake":
+            if self._last_message_time:
+                return f"Last data: {self._last_message_time.strftime('%H:%M:%S')}"
+            return "No data received"
 
         return "Unknown"
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        # Connected sensor is always available
-        if self._sensor_key == "connected":
+        # Awake sensor is always available
+        if self._sensor_key == "awake":
             return True
         # Other sensors need at least one data point
         return len(self._data_cache) > 0 or self._last_updated is not None

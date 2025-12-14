@@ -211,10 +211,11 @@ class TeslaMQTTClient:
 
     def _notify_callbacks(self, field_name: str, value: Any) -> None:
         """Notify registered callbacks with the field value."""
-        if field_name in self._callbacks:
-            # Create data dict with timestamp placeholder
-            data = {"timestamp": None, field_name: value}
+        # Create data dict with timestamp placeholder
+        data = {"timestamp": None, field_name: value}
 
+        # Notify field-specific callbacks
+        if field_name in self._callbacks:
             for callback_fn in self._callbacks[field_name]:
                 try:
                     callback_fn(value, data)
@@ -222,3 +223,11 @@ class TeslaMQTTClient:
                     _LOGGER.error(
                         "Error in callback for %s: %s", field_name, err
                     )
+
+        # Notify "any" callbacks (for awake sensor)
+        if "any" in self._callbacks:
+            for callback_fn in self._callbacks["any"]:
+                try:
+                    callback_fn(value, data)
+                except Exception as err:
+                    _LOGGER.error("Error in 'any' callback: %s", err)
