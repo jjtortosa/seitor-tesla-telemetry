@@ -143,7 +143,14 @@ TELEMETRY_PRESETS: Final = {
 }
 
 # Platforms
-PLATFORMS: Final = [Platform.DEVICE_TRACKER, Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
+PLATFORMS: Final = [
+    Platform.DEVICE_TRACKER,
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.SWITCH,
+    Platform.NUMBER,
+]
 
 # VIN validation
 VIN_LENGTH: Final = 17
