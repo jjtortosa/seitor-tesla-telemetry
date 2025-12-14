@@ -1,0 +1,2 @@
+# Requirements for Tesla Fleet Telemetry Demo
+paho-mqtt>=1.6.0

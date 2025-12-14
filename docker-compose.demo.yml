@@ -1,0 +1,100 @@
+version: '3.8'
+
+# Tesla Fleet Telemetry Demo Stack
+#
+# This creates a complete demo environment with:
+# - Home Assistant with the Tesla integration pre-installed
+# - Mosquitto MQTT broker
+# - Mock telemetry generator simulating a Tesla vehicle
+#
+# Usage:
+#   docker compose -f docker-compose.demo.yml up -d
+#
+# Access:
+#   Home Assistant: http://localhost:8123
+#   (First run will require onboarding)
+
+services:
+  # Home Assistant
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: ha-demo
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - ha-config:/config
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "8123:8123"
+    environment:
+      - TZ=Europe/Madrid
+    depends_on:
+      - mosquitto
+    networks:
+      - demo-network
+
+  # MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mqtt-demo
+    restart: unless-stopped
+    volumes:
+      - mosquitto-config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    ports:
+      - "1883:1883"
+    command: mosquitto -c /mosquitto-no-auth.conf
+    networks:
+      - demo-network
+
+  # Mock Telemetry Generator
+  mock-telemetry:
+    build:
+      context: ./tools/demo
+      dockerfile: Dockerfile
+    container_name: tesla-mock
+    restart: unless-stopped
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    command: >
+      --mqtt-host mosquitto
+      --mqtt-port 1883
+      --topic-base tesla
+      --vin DEMO0TESLA0VIN00
+      --scenario driving
+      --duration 3600
+      --interval 5
+      --continuous
+    depends_on:
+      - mosquitto
+    networks:
+      - demo-network
+
+  # Mosquitto config initializer
+  mosquitto-init:
+    image: eclipse-mosquitto:2
+    container_name: mqtt-init
+    volumes:
+      - mosquitto-config:/mosquitto/config
+    entrypoint: /bin/sh
+    command: >
+      -c "echo 'listener 1883
+      allow_anonymous true
+      persistence true
+      persistence_location /mosquitto/data/
+      log_dest stdout' > /mosquitto/config/mosquitto.conf &&
+      cp /mosquitto/config/mosquitto.conf /mosquitto-no-auth.conf"
+    networks:
+      - demo-network
+
+volumes:
+  ha-config:
+  mosquitto-config:
+  mosquitto-data:
+  mosquitto-log:
+
+networks:
+  demo-network:
+    driver: bridge
