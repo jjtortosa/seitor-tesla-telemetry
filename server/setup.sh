@@ -29,6 +29,7 @@ echo "║  You will need:                                              ║"
 echo "║    - A public domain with DNS configured                     ║"
 echo "║    - SSL certificates for your domain                        ║"
 echo "║    - Docker and Docker Compose installed                     ║"
+echo "║    - MQTT broker (Mosquitto) in Home Assistant               ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -87,45 +88,57 @@ echo -e "${GREEN}✓ Domain: $TELEMETRY_DOMAIN${NC}"
 echo ""
 
 # ============================================================
-# STEP 2: Server IP Configuration
+# STEP 2: MQTT Broker Configuration
 # ============================================================
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}Step 2: Kafka Network Configuration${NC}"
+echo -e "${BLUE}Step 2: MQTT Broker Configuration${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "Enter the IP address or hostname where Kafka will be accessible."
-echo "This is used by Home Assistant to connect to Kafka."
-echo ""
-echo "Options:"
-echo "  - Local IP (e.g., 192.168.1.100) - If HA is on same network"
-echo "  - localhost - If HA runs on same machine"
-echo "  - Docker host IP - If HA is in a container"
+echo "Enter your Home Assistant MQTT broker details."
+echo "This is typically the Mosquitto add-on in Home Assistant."
 echo ""
 
 # Try to detect local IP
 DETECTED_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ip route get 1 2>/dev/null | awk '{print $7}' || echo "")
 if [ -n "$DETECTED_IP" ]; then
-    echo -e "${YELLOW}Detected IP: $DETECTED_IP${NC}"
+    echo -e "${YELLOW}Detected network IP: $DETECTED_IP${NC}"
 fi
 
-read -p "Kafka Host [${DETECTED_IP:-localhost}]: " KAFKA_HOST
-KAFKA_HOST=${KAFKA_HOST:-${DETECTED_IP:-localhost}}
+read -p "MQTT Broker Host (Home Assistant IP): " MQTT_HOST
+if [ -z "$MQTT_HOST" ]; then
+    echo -e "${RED}❌ MQTT host is required${NC}"
+    exit 1
+fi
 
-echo -e "${GREEN}✓ Kafka Host: $KAFKA_HOST${NC}"
+read -p "MQTT Port [1883]: " MQTT_PORT
+MQTT_PORT=${MQTT_PORT:-1883}
+
+read -p "MQTT Username: " MQTT_USERNAME
+read -s -p "MQTT Password: " MQTT_PASSWORD
+echo ""
+
+if [ -z "$MQTT_USERNAME" ] || [ -z "$MQTT_PASSWORD" ]; then
+    echo -e "${YELLOW}⚠ MQTT credentials not set. Make sure anonymous access is enabled.${NC}"
+fi
+
+echo -e "${GREEN}✓ MQTT Broker: $MQTT_HOST:$MQTT_PORT${NC}"
 echo ""
 
 # ============================================================
-# STEP 3: Kafka Topic Configuration
+# STEP 3: MQTT Topic Configuration
 # ============================================================
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}Step 3: Kafka Topic Configuration${NC}"
+echo -e "${BLUE}Step 3: MQTT Topic Configuration${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+echo "MQTT topic base for telemetry messages."
+echo "Topics will be: <base>/<VIN>/v/<field>"
+echo ""
 
-read -p "Kafka Topic [tesla_telemetry]: " KAFKA_TOPIC
-KAFKA_TOPIC=${KAFKA_TOPIC:-tesla_telemetry}
+read -p "MQTT Topic Base [tesla]: " MQTT_TOPIC_BASE
+MQTT_TOPIC_BASE=${MQTT_TOPIC_BASE:-tesla}
 
-echo -e "${GREEN}✓ Kafka Topic: $KAFKA_TOPIC${NC}"
+echo -e "${GREEN}✓ MQTT Topic Base: $MQTT_TOPIC_BASE${NC}"
 echo ""
 
 # ============================================================
@@ -159,10 +172,12 @@ cat > .env << EOF
 # Domain Configuration
 TELEMETRY_DOMAIN=${TELEMETRY_DOMAIN}
 
-# Kafka Configuration
-KAFKA_HOST=${KAFKA_HOST}
-KAFKA_PORT=9092
-KAFKA_TOPIC=${KAFKA_TOPIC}
+# MQTT Configuration
+MQTT_HOST=${MQTT_HOST}
+MQTT_PORT=${MQTT_PORT}
+MQTT_USERNAME=${MQTT_USERNAME}
+MQTT_PASSWORD=${MQTT_PASSWORD}
+MQTT_TOPIC_BASE=${MQTT_TOPIC_BASE}
 
 # Paths (relative to docker-compose.yml)
 CERTS_PATH=./certs
@@ -178,7 +193,7 @@ echo -e "${GREEN}✓ Created .env file${NC}"
 # Generate config.json
 cat > config.json << EOF
 {
-  "host": "${TELEMETRY_DOMAIN}",
+  "host": "0.0.0.0",
   "port": 443,
   "log_level": "info",
   "json_log_enable": true,
@@ -187,18 +202,28 @@ cat > config.json << EOF
     "server_cert": "/certs/fullchain.pem",
     "server_key": "/certs/privkey.pem"
   },
-  "kafka": {
-    "brokers": ["kafka:9092"],
-    "topic": "${KAFKA_TOPIC}"
+  "mqtt": {
+    "broker": "${MQTT_HOST}:${MQTT_PORT}",
+    "client_id": "fleet-telemetry",
+    "username": "${MQTT_USERNAME}",
+    "password": "${MQTT_PASSWORD}",
+    "topic_base": "${MQTT_TOPIC_BASE}",
+    "qos": 1,
+    "retained": true
+  },
+  "records": {
+    "V": ["mqtt"],
+    "alerts": ["mqtt"],
+    "errors": ["mqtt"]
+  },
+  "reliable_ack": true,
+  "reliable_ack_sources": {
+    "V": "mqtt"
   },
   "rate_limit": {
     "enabled": true,
     "message_limit": 1000,
     "message_interval_time_seconds": 30
-  },
-  "reliable_ack": true,
-  "reliable_ack_sources": {
-    "source_names": ["kafka"]
   },
   "metrics": {
     "port": 8443,
@@ -209,15 +234,6 @@ cat > config.json << EOF
 EOF
 
 echo -e "${GREEN}✓ Created config.json${NC}"
-
-# Update docker-compose with external Kafka port
-if [ "$KAFKA_HOST" != "localhost" ] && [ "$KAFKA_HOST" != "127.0.0.1" ]; then
-    # Update Kafka advertised listeners for external access
-    sed -i.bak "s/PLAINTEXT_HOST:\/\/localhost:29092/PLAINTEXT_HOST:\/\/${KAFKA_HOST}:9092/g" docker-compose.yml 2>/dev/null || \
-    sed -i '' "s/PLAINTEXT_HOST:\/\/localhost:29092/PLAINTEXT_HOST:\/\/${KAFKA_HOST}:9092/g" docker-compose.yml
-    echo -e "${GREEN}✓ Updated docker-compose.yml for external Kafka access${NC}"
-fi
-
 echo ""
 
 # ============================================================
@@ -254,9 +270,9 @@ echo "╚═══════════════════════�
 echo -e "${NC}"
 
 echo -e "${GREEN}Configuration Summary:${NC}"
-echo "  Domain:      $TELEMETRY_DOMAIN"
-echo "  Kafka Host:  $KAFKA_HOST:9092"
-echo "  Kafka Topic: $KAFKA_TOPIC"
+echo "  Domain:          $TELEMETRY_DOMAIN"
+echo "  MQTT Broker:     $MQTT_HOST:$MQTT_PORT"
+echo "  MQTT Topic Base: $MQTT_TOPIC_BASE"
 echo ""
 
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -277,6 +293,7 @@ echo ""
 
 echo -e "${BLUE}2. DNS Configuration${NC}"
 echo "   Ensure ${TELEMETRY_DOMAIN} points to this server's public IP."
+echo "   Important: Do NOT proxy through Cloudflare (grey cloud, not orange)."
 echo ""
 
 echo -e "${BLUE}3. Firewall/Port Forwarding${NC}"
@@ -299,10 +316,17 @@ echo "   docker compose ps"
 echo "   docker compose logs -f fleet-telemetry"
 echo ""
 
-echo -e "${BLUE}6. Home Assistant Integration${NC}"
+echo -e "${BLUE}6. Verify MQTT Messages${NC}"
+echo "   Subscribe to MQTT topics from Home Assistant:"
+echo "   mosquitto_sub -h localhost -t \"${MQTT_TOPIC_BASE}/#\" -v"
+echo ""
+
+echo -e "${BLUE}7. Home Assistant Integration${NC}"
 echo "   In HA, add the Tesla Fleet Telemetry Local integration:"
-echo "   - Kafka Broker: ${KAFKA_HOST}:9092"
-echo "   - Topic: ${KAFKA_TOPIC}"
+echo "   Settings → Devices & Services → Add Integration"
+echo "   - MQTT Topic Base: ${MQTT_TOPIC_BASE}"
+echo "   - Vehicle VIN: Your 17-character VIN"
+echo "   - Vehicle Name: Friendly name"
 echo ""
 
 echo -e "${GREEN}For detailed instructions, see: docs/04_server_deployment.md${NC}"

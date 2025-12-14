@@ -126,13 +126,6 @@ echo ""
 # Check 6: Ports availability
 echo -e "${BLUE}[6/10]${NC} Checking port availability..."
 if command -v netstat &> /dev/null; then
-    if netstat -tuln | grep -q ":9092 "; then
-        check_warn "Port 9092 (Kafka) is already in use"
-        echo "       Stop existing service or use different port"
-    else
-        check_pass "Port 9092 (Kafka) is available"
-    fi
-
     if netstat -tuln | grep -q ":443 "; then
         check_warn "Port 443 (HTTPS) is already in use"
         echo "       This may conflict with Fleet Telemetry"
@@ -140,12 +133,6 @@ if command -v netstat &> /dev/null; then
         check_pass "Port 443 (HTTPS) is available"
     fi
 elif command -v ss &> /dev/null; then
-    if ss -tuln | grep -q ":9092 "; then
-        check_warn "Port 9092 (Kafka) is already in use"
-    else
-        check_pass "Port 9092 (Kafka) is available"
-    fi
-
     if ss -tuln | grep -q ":443 "; then
         check_warn "Port 443 (HTTPS) is already in use"
     else

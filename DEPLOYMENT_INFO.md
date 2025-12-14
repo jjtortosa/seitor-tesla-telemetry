@@ -91,7 +91,7 @@
 11. **Test Vehicle Connection** (30 min)
     - Wake vehicle
     - Monitor logs for connection
-    - Verify Kafka messages
+    - Verify MQTT messages
 
 12. **Install HA Integration** (30 min)
     - Copy custom_components to /Volumes/config/
@@ -196,13 +196,10 @@ docker compose ps
 docker compose logs -f fleet-telemetry
 ```
 
-### Check Kafka Messages
+### Check MQTT Messages
 ```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server localhost:9092 \
-  --topic tesla_telemetry \
-  --from-beginning \
-  --max-messages 10
+# From Home Assistant terminal or SSH
+mosquitto_sub -h localhost -t "tesla/#" -v
 ```
 
 ### HA Integration Path
@@ -230,12 +227,12 @@ All detailed step-by-step instructions available in:
 
 ## Current Project Status
 
-- ✅ **v0.1.0** - Core implementation complete
-- ✅ Documentation: 6 guides (~20k words)
+- ✅ **v2.0.0** - MQTT architecture complete
+- ✅ Documentation: 7 guides (~25k words)
 - ✅ Server infrastructure: Docker Compose stack ready
 - ✅ HA integration: Custom component complete (~1,500 lines)
-- ⏳ Protobuf schema: Placeholder (needs compilation)
-- ⏳ Real deployment: PENDING (start tomorrow)
+- ✅ JSON format: Simple parsing, no Protobuf complexity
+- ⏳ Real deployment: PENDING
 
 ---
 

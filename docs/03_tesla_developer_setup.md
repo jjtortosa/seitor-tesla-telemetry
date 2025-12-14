@@ -646,4 +646,4 @@ Tesla Developer setup complete! Proceed to:
 
 **[04 - Server Deployment →](04_server_deployment.md)**
 
-This will guide you through deploying the Fleet Telemetry server with Docker Compose and Kafka.
+This will guide you through deploying the Fleet Telemetry server with Docker Compose and MQTT.

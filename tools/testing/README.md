@@ -12,23 +12,28 @@ This directory contains utilities to help you:
 
 ### Mock Message Generator (`generate_mock_message.py`)
 
-Generate realistic Tesla telemetry messages for testing the Home Assistant integration.
+Generate realistic Tesla telemetry JSON messages for testing the Home Assistant integration via MQTT.
 
 #### Usage
 
 **Generate driving scenario (default)**:
 ```bash
-python3 generate_mock_message.py --scenario driving --json
+python3 generate_mock_message.py --scenario driving
 ```
 
 **Generate charging scenario**:
 ```bash
-python3 generate_mock_message.py --scenario charging --output charging.bin
+python3 generate_mock_message.py --scenario charging --vin YOUR_VIN
 ```
 
-**Generate parked scenario**:
+**Generate and publish directly to MQTT**:
 ```bash
-python3 generate_mock_message.py --scenario parked --vin 5YJ3E1EA1MF000000
+python3 generate_mock_message.py --scenario driving --publish --mqtt-host 192.168.5.201
+```
+
+**Output raw JSON**:
+```bash
+python3 generate_mock_message.py --scenario parked --json
 ```
 
 #### Scenarios
@@ -36,14 +41,21 @@ python3 generate_mock_message.py --scenario parked --vin 5YJ3E1EA1MF000000
 | Scenario | Description | Key Fields |
 |----------|-------------|------------|
 | `driving` | Vehicle in motion | Speed: 65 km/h, Gear: D, Location updating |
-| `charging` | Charging at home | Speed: 0, Gear: P, ChargeState: Charging, 3.7kW |
+| `charging` | Charging at home | Speed: 0, Gear: P, ChargeState: Charging |
 | `parked` | Parked with Sentry Mode | Speed: 0, Gear: P, SentryMode: On |
 
-#### Output Formats
+#### Options
 
-- **`--json`**: Human-readable JSON format (for inspection)
-- **`--output file.bin`**: Binary Protobuf format (for testing)
-- **No flags**: Hexadecimal output to stdout
+| Flag | Description |
+|------|-------------|
+| `--scenario` | Scenario to simulate (driving, charging, parked) |
+| `--vin` | Vehicle VIN (default: LRWYGCFS3RC210528) |
+| `--topic-base` | MQTT topic base (default: tesla) |
+| `--publish` | Publish directly to MQTT broker |
+| `--mqtt-host` | MQTT broker host (default: localhost) |
+| `--mqtt-user` | MQTT username |
+| `--mqtt-pass` | MQTT password |
+| `--json` | Output raw JSON data |
 
 ---
 
@@ -73,13 +85,13 @@ mosquitto_sub -h localhost -u mqtt_user -P your_password -t "tesla/LRWYGCFS3RC21
 
 Test the integration without a real Tesla vehicle.
 
-**Step 1: Generate mock message**
+**Step 1: Generate mock messages**
 ```bash
 cd tools/testing
-python3 generate_mock_message.py --scenario driving --json
+python3 generate_mock_message.py --scenario driving
 ```
 
-**Step 2: Publish to MQTT**
+**Step 2: Publish to MQTT manually**
 ```bash
 # Publish battery level
 mosquitto_pub -h localhost -u mqtt_user -P password -t "tesla/VIN/v/Soc" -m '{"value": 85}'
@@ -148,17 +160,9 @@ Complete end-to-end test of the integration.
 
 ### Mock Generator Issues
 
-**Error**: `ModuleNotFoundError: No module named 'google'`
-```bash
-pip3 install protobuf>=5.27.0
-```
-
-**Error**: `Cannot find vehicle_data_pb2`
-```bash
-# Compile Protobuf first
-cd ../../tools/protobuf
-./compile_proto.sh
-```
+**Error**: `ModuleNotFoundError: No module named 'json'`
+- This shouldn't happen as json is a built-in Python module
+- Verify Python 3 is installed: `python3 --version`
 
 ### MQTT Issues
 

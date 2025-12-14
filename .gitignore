@@ -29,9 +29,8 @@ access_token.txt
 # Docker
 docker-compose.override.yml
 
-# Kafka data
-server/kafka-data/
-server/zookeeper-data/
+# Server data
+server/data/
 
 # Logs
 *.log

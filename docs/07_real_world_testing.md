@@ -1,6 +1,6 @@
 # Real-World Testing Guide - HA Test Deployment
 
-This guide covers testing the Tesla Fleet Telemetry integration on your **Home Assistant Test instance** with the server stack running on the same machine.
+This guide covers testing the Tesla Fleet Telemetry integration on your **Home Assistant Test instance** with the server publishing directly to MQTT.
 
 ## Overview
 
@@ -11,26 +11,27 @@ This guide covers testing the Tesla Fleet Telemetry integration on your **Home A
 │                                             │
 │  ┌──────────────────────────────────────┐  │
 │  │  Home Assistant                      │  │
+│  │  - Mosquitto Add-on (MQTT Broker)    │  │
 │  │  - Custom Integration                │  │
-│  │  - Connects to localhost:9092        │  │
+│  │  - Subscribes to MQTT topics         │  │
 │  └──────────────────────────────────────┘  │
 │                                             │
 │  ┌──────────────────────────────────────┐  │
-│  │  Docker Stack (localhost)            │  │
-│  │  - Kafka (port 9092)                 │  │
-│  │  - Tesla Fleet Telemetry             │  │
-│  │  - Nginx (HTTPS proxy)               │  │
+│  │  Docker Stack (on server)            │  │
+│  │  - Tesla Fleet Telemetry (HTTPS)     │  │
+│  │  - Publishes to MQTT broker          │  │
 │  └──────────────────────────────────────┘  │
 │                                             │
-│  Internet ← tesla-telemetry.seitor.com     │
+│  Internet ← tesla-telemetry.yourdomain.com  │
 └─────────────────────────────────────────────┘
 ```
 
 **Why this approach?**
-- ✅ Simple setup (everything in one place)
+- ✅ Simple setup (MQTT broker already in HA)
 - ✅ Fast iteration (easy to restart/debug)
 - ✅ Safe testing environment (separate from production HA)
-- ✅ Easy migration to Ubuntu Server later if needed
+- ✅ Low resource usage (no additional services)
+- ✅ Easy migration to production later
 
 ---
 
@@ -38,30 +39,28 @@ This guide covers testing the Tesla Fleet Telemetry integration on your **Home A
 
 ### Required Information
 - [ ] Tesla VIN: `_______________________` (17 characters)
-- [ ] Domain: `tesla-telemetry.seitor.com` (configured in DNS)
+- [ ] Domain: `tesla-telemetry.yourdomain.com` (configured in DNS)
 - [ ] SSL Certificate: Ready or will use Let's Encrypt
-- [ ] HA Test IP: `_______________________`
+- [ ] HA IP Address: `_______________________`
 - [ ] Tesla Developer Account: ✅ Configured
 - [ ] Virtual Key: ✅ Paired with vehicle
 
 ### Required Access
-- [ ] SSH/Console access to HA Test container
-- [ ] Docker installed on HA Test
-- [ ] Git installed on HA Test
-- [ ] Ports 9092 (Kafka) and 443 (HTTPS) available
+- [ ] SSH/Console access to server
+- [ ] Docker installed
+- [ ] Git installed
+- [ ] Port 443 (HTTPS) forwarded to server
+- [ ] Mosquitto add-on running in Home Assistant
 
 ---
 
 ## Phase 1: Deploy Server Stack (1-2 hours)
 
-### Step 1.1: Access HA Test Container
+### Step 1.1: Access Server
 
 ```bash
-# From Proxmox host
-pct enter <CONTAINER_ID>
-
-# Or via SSH
-ssh root@<HA_TEST_IP>
+# SSH into your server
+ssh root@your-server-ip
 ```
 
 ### Step 1.2: Install Prerequisites
@@ -82,29 +81,40 @@ git --version
 
 ```bash
 # Navigate to appropriate location
-cd /opt  # or /root, your choice
+cd /opt
 
 # Clone repository
-git clone https://github.com/jjtortosa/seitor-tesla-telemetry.git
-cd seitor-tesla-telemetry
+git clone https://github.com/jjtortosa/seitor-tesla-telemetry.git tesla-telemetry
+cd tesla-telemetry/server
 ```
 
 ### Step 1.4: Configure Server
 
 ```bash
-cd server
-
-# Review docker-compose.yml
-cat docker-compose.yml
-
-# Review config.json (Tesla Fleet Telemetry config)
-cat config.json
+# Run interactive setup
+./setup.sh
 ```
 
-**Important**: Verify `config.json` contains:
-- Correct hostname: `tesla-telemetry.seitor.com`
-- Correct Kafka broker: `kafka:9092` (internal Docker network)
-- SSL certificate paths are correct
+The script will prompt for:
+- **Domain**: `tesla-telemetry.yourdomain.com`
+- **MQTT Broker Host**: Your Home Assistant IP (e.g., `192.168.1.50`)
+- **MQTT Port**: `1883`
+- **MQTT Username**: Your Mosquitto username
+- **MQTT Password**: Your Mosquitto password
+- **MQTT Topic Base**: `tesla` (default)
+
+**Verify configuration**:
+```bash
+# Check config.json
+cat config.json
+
+# Should show MQTT configuration like:
+# "mqtt": {
+#   "broker": "192.168.1.50:1883",
+#   "username": "mqtt_user",
+#   "topic_base": "tesla"
+# }
+```
 
 ### Step 1.5: Prepare SSL Certificates
 
@@ -112,8 +122,10 @@ cat config.json
 ```bash
 # Copy your SSL certificate files to server/certs/
 mkdir -p certs
-cp /path/to/your/cert.pem certs/
-cp /path/to/your/key.pem certs/
+cp /path/to/fullchain.pem certs/
+cp /path/to/privkey.pem certs/
+chmod 644 certs/fullchain.pem
+chmod 600 certs/privkey.pem
 ```
 
 **Option B: Let's Encrypt (Certbot)**
@@ -121,79 +133,76 @@ cp /path/to/your/key.pem certs/
 # Install certbot
 apt-get install -y certbot
 
-# Generate certificate
-certbot certonly --standalone -d tesla-telemetry.seitor.com
+# Generate certificate (stop any service using port 443 first)
+certbot certonly --standalone -d tesla-telemetry.yourdomain.com
 
 # Copy to server directory
 mkdir -p certs
-cp /etc/letsencrypt/live/tesla-telemetry.seitor.com/fullchain.pem certs/cert.pem
-cp /etc/letsencrypt/live/tesla-telemetry.seitor.com/privkey.pem certs/key.pem
+cp /etc/letsencrypt/live/tesla-telemetry.yourdomain.com/fullchain.pem certs/
+cp /etc/letsencrypt/live/tesla-telemetry.yourdomain.com/privkey.pem certs/
 ```
 
 ### Step 1.6: Start Docker Stack
 
 ```bash
-# Start all services
-docker-compose up -d
+# Start fleet-telemetry service
+docker compose up -d
 
-# Verify all containers are running
-docker-compose ps
+# Verify container is running
+docker compose ps
 
 # Expected output:
-# NAME                STATUS
-# kafka               Up
-# fleet-telemetry     Up
-# nginx               Up (or similar names)
+# NAME              STATUS         PORTS
+# fleet-telemetry   Up (healthy)   0.0.0.0:443->443/tcp
 ```
 
 ### Step 1.7: Verify Services
 
 ```bash
-# Check Kafka is listening
-netstat -tuln | grep 9092
-# Expected: LISTEN on 0.0.0.0:9092
-
 # Check HTTPS endpoint
-curl -k https://localhost/status
-# or
-curl https://tesla-telemetry.seitor.com/status
+curl -k https://localhost:443/health
+# Expected: {"status": "ok"}
 
-# Check logs
-docker-compose logs -f fleet-telemetry
-# Should show: "Server started on port 443" or similar
+# Check external access
+curl -k https://tesla-telemetry.yourdomain.com/health
+
+# Check logs for MQTT connection
+docker compose logs -f fleet-telemetry
+# Should show: "MQTT connection established" or similar
 ```
 
-### Step 1.8: Test Kafka Connectivity
+### Step 1.8: Test MQTT Connectivity
 
 ```bash
-# From inside HA Test container
-nc -zv localhost 9092
+# From Home Assistant terminal, test MQTT subscription
+mosquitto_sub -h localhost -t "tesla/#" -v
 
-# Expected output:
-# Connection to localhost 9092 port [tcp/*] succeeded!
+# Keep this running to see messages when vehicle connects
 ```
 
 ---
 
 ## Phase 2: Install HA Integration (30 minutes)
 
-### Step 2.1: Access Home Assistant Container
+### Step 2.1: Access Home Assistant
 
-```bash
-# If HA is also running in Docker on HA Test
-docker exec -it homeassistant bash
+Navigate to your Home Assistant web interface.
 
-# Or if HA is the main process, just navigate to /config
-cd /config
-```
+### Step 2.2: Ensure MQTT is Configured
 
-### Step 2.2: Copy Integration Files
+1. Go to **Settings → Add-ons**
+2. Verify **Mosquitto broker** is installed and running
+3. Go to **Settings → Devices & Services**
+4. Verify **MQTT** integration is configured
 
+### Step 2.3: Copy Integration Files
+
+**From HA Terminal or SSH**:
 ```bash
 # Navigate to config directory
 cd /config
 
-# Clone repository (if not already cloned)
+# Clone repository
 git clone https://github.com/jjtortosa/seitor-tesla-telemetry.git
 
 # Copy custom component
@@ -203,90 +212,58 @@ cp -r seitor-tesla-telemetry/ha-integration/custom_components/tesla_telemetry_lo
 
 # Verify files
 ls -la custom_components/tesla_telemetry_local/
-# Should see: __init__.py, manifest.json, kafka_consumer.py, etc.
+# Should see: __init__.py, manifest.json, config_flow.py, mqtt_client.py, etc.
 ```
 
-### Step 2.3: Install Python Dependencies
+### Step 2.4: Restart Home Assistant
 
 ```bash
-# Still inside HA container
-pip3 install kafka-python==2.0.2 protobuf>=5.27.0
-
-# Verify installation
-pip3 list | grep -E "kafka|protobuf"
-# Expected:
-# kafka-python    2.0.2
-# protobuf        6.33.0 (or >=5.27.0)
+ha core restart
 ```
 
-### Step 2.4: Configure Integration
+Or via UI: **Settings → System → Restart**
 
-Edit `/config/configuration.yaml`:
+### Step 2.5: Add Integration via UI
 
+1. Go to **Settings → Devices & Services**
+2. Click **Add Integration**
+3. Search for **Tesla Fleet Telemetry Local**
+4. Enter configuration:
+   - **MQTT Topic Base**: `tesla` (must match server config)
+   - **Vehicle VIN**: Your 17-character VIN
+   - **Vehicle Name**: Friendly name (e.g., "MelanY")
+5. Click **Submit**
+
+### Step 2.6: Verify Integration Loaded
+
+Check the integration shows with 13 entities:
+- 1 device_tracker
+- 8 sensors
+- 4 binary_sensors
+
+Enable debug logging if needed:
 ```yaml
-# Add at the end of the file
-tesla_telemetry_local:
-  kafka_broker: "localhost:9092"          # Kafka is on same machine
-  kafka_topic: "tesla_telemetry"          # Default topic
-  vehicle_vin: "YOUR_TESLA_VIN_HERE"      # Replace with your VIN
-  vehicle_name: "MelanY"                  # Your vehicle name
-
-# Enable debug logging
+# In configuration.yaml
 logger:
   default: info
   logs:
     custom_components.tesla_telemetry_local: debug
 ```
 
-**IMPORTANT**: Replace `YOUR_TESLA_VIN_HERE` with your actual Tesla VIN (17 characters).
-
-### Step 2.5: Restart Home Assistant
-
-```bash
-# Exit from HA container
-exit
-
-# Restart Home Assistant
-ha core restart
-
-# Or if using Docker directly:
-docker restart homeassistant
-```
-
-### Step 2.6: Verify Integration Loaded
-
-```bash
-# Wait ~30 seconds for HA to restart
-
-# Check logs
-docker exec -it homeassistant tail -f /config/home-assistant.log | grep tesla_telemetry_local
-
-# Expected logs:
-# "Setting up tesla_telemetry_local"
-# "Connecting to Kafka broker: localhost:9092"
-# "Successfully connected to Kafka broker"
-```
-
 ---
 
 ## Phase 3: Validate Connection (1 hour)
 
-### Step 3.1: Monitor Kafka Messages
+### Step 3.1: Monitor MQTT Messages
 
-**Terminal 1**: Monitor Kafka from tools
+**Terminal 1**: Monitor MQTT from HA
 ```bash
-cd /opt/seitor-tesla-telemetry/tools/testing
-
-# Install dependencies if needed
-pip3 install kafka-python protobuf>=5.27.0
-
-# Start debugger
-python3 kafka_debugger.py --broker localhost:9092 --from-beginning
+mosquitto_sub -h localhost -t "tesla/#" -v
 ```
 
 **Expected**:
 - If no messages yet: "Waiting for messages..."
-- If vehicle is sending: See Protobuf parsed messages
+- If vehicle is sending: Messages like `tesla/VIN/v/BatteryLevel {"value": 78}`
 
 ### Step 3.2: Trigger Vehicle Activity
 
@@ -302,44 +279,26 @@ python3 kafka_debugger.py --broker localhost:9092 --from-beginning
 
 **Terminal 2**: Watch Home Assistant logs
 ```bash
-docker exec -it homeassistant tail -f /config/home-assistant.log | grep tesla_telemetry_local
+tail -f /config/home-assistant.log | grep tesla_telemetry_local
 ```
 
 **Expected logs when messages arrive**:
 ```
-[tesla_telemetry_local] Received telemetry message: offset=0, fields=['Location', 'VehicleSpeed', 'Gear', 'Soc', ...]
-[tesla_telemetry_local] Updated device_tracker.melany_location: (41.3874, 2.1686)
-[tesla_telemetry_local] Updated sensor.melany_speed: 0
+[tesla_telemetry_local] MQTT message received: tesla/VIN/v/BatteryLevel
 [tesla_telemetry_local] Updated sensor.melany_battery: 80
+[tesla_telemetry_local] MQTT message received: tesla/VIN/v/VehicleSpeed
+[tesla_telemetry_local] Updated sensor.melany_speed: 0
 ```
 
 ### Step 3.4: Check Entities in Home Assistant
 
-```bash
-# List all entities
-ha state list | grep melany
+Via **Developer Tools → States**:
 
-# Check specific entities
-ha state get device_tracker.melany_location
-ha state get sensor.melany_speed
-ha state get sensor.melany_battery
-ha state get binary_sensor.melany_driving
-```
-
-**Expected output**:
-```json
-{
-  "entity_id": "device_tracker.melany_location",
-  "state": "home",
-  "attributes": {
-    "latitude": 41.3874,
-    "longitude": 2.1686,
-    "gps_accuracy": 0,
-    "source_type": "gps",
-    "friendly_name": "MelanY Location"
-  }
-}
-```
+Search for your vehicle name and verify:
+- `device_tracker.melany_location` - Shows coordinates
+- `sensor.melany_speed` - Shows speed
+- `sensor.melany_battery` - Shows battery %
+- `binary_sensor.melany_driving` - Shows on/off
 
 ---
 
@@ -349,15 +308,12 @@ ha state get binary_sensor.melany_driving
 
 **Action**: Vehicle parked, locked, not charging
 
-**Verify**:
-```bash
-# Check states
-ha state get sensor.melany_speed              # Should be: 0
-ha state get sensor.melany_shift_state        # Should be: P
-ha state get binary_sensor.melany_driving     # Should be: off
-ha state get binary_sensor.melany_charging    # Should be: off
-ha state get sensor.melany_battery            # Should show current %
-```
+**Verify** (via Developer Tools → States):
+- `sensor.melany_speed` = 0
+- `sensor.melany_shift_state` = P
+- `binary_sensor.melany_driving` = off
+- `binary_sensor.melany_charging` = off
+- `sensor.melany_battery` = current %
 
 ### Scenario 2: Driving
 
@@ -371,9 +327,9 @@ ha state get sensor.melany_battery            # Should show current %
 - [ ] Location appears on HA map
 
 **Check latency**:
-```bash
-# Compare vehicle dashboard time vs HA state update
-# Goal: <5 seconds lag
+```
+Compare vehicle dashboard time vs HA state update
+Goal: <5 seconds lag
 ```
 
 ### Scenario 3: Charging
@@ -381,18 +337,13 @@ ha state get sensor.melany_battery            # Should show current %
 **Action**: Plug in charger at home
 
 **Verify**:
-```bash
-ha state get binary_sensor.melany_charging        # Should be: on
-ha state get sensor.melany_charging_state         # Should be: Charging
-ha state get sensor.melany_charger_voltage        # Should show voltage
-ha state get sensor.melany_charger_current        # Should show amperage
-```
+- `binary_sensor.melany_charging` = on
+- `sensor.melany_charging_state` = Charging
+- `sensor.melany_charger_voltage` = shows voltage
+- `sensor.melany_charger_current` = shows amperage
 
 **Monitor charging progress**:
-```bash
-# Watch battery level increase
-watch -n 10 'ha state get sensor.melany_battery'
-```
+Watch battery level increase over time.
 
 ### Scenario 4: Zones
 
@@ -409,8 +360,9 @@ watch -n 10 'ha state get sensor.melany_battery'
 
 ### Test Automation 1: Arrival Notification
 
-Edit `/config/configuration.yaml`:
+Via UI: **Settings → Automations & Scenes → Create Automation**
 
+Or YAML:
 ```yaml
 automation:
   - alias: "Test: MelanY Arrived Home"
@@ -483,14 +435,12 @@ automation:
 # Check Docker resource usage
 docker stats
 
+# Check MQTT message rate
+mosquitto_sub -h localhost -t "tesla/#" -v | pv -l -i 10 > /dev/null
+# Shows messages per second
+
 # Check HA memory/CPU
 docker exec -it homeassistant top
-
-# Check Kafka consumer lag
-docker exec -it kafka kafka-consumer-groups \
-  --bootstrap-server localhost:9092 \
-  --group ha_tesla_YOUR_VIN \
-  --describe
 ```
 
 ### Common Issues
@@ -498,79 +448,67 @@ docker exec -it kafka kafka-consumer-groups \
 **Issue 1: No messages received**
 ```bash
 # Check Fleet Telemetry logs
-docker logs -f fleet-telemetry
+docker compose logs -f fleet-telemetry
 
-# Check Kafka topics
-docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
+# Check MQTT connectivity from server
+nc -zv 192.168.1.50 1883
 
-# Should see: tesla_telemetry
-
-# Check messages in Kafka
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server localhost:9092 \
-  --topic tesla_telemetry \
-  --from-beginning \
-  --max-messages 1
+# Test MQTT subscription
+mosquitto_sub -h 192.168.1.50 -u mqtt_user -P mqtt_password -t "tesla/#" -v
 ```
 
-**Issue 2: Parse errors**
+**Issue 2: Integration not updating**
 ```bash
-# Check Protobuf version
-docker exec -it homeassistant pip3 show protobuf
+# Check MQTT integration in HA
+# Settings → Devices & Services → MQTT → should show "Connected"
 
-# Should be >=5.27.0
+# Check integration logs
+tail -f /config/home-assistant.log | grep tesla_telemetry_local
 
-# Re-install if needed
-docker exec -it homeassistant pip3 install --upgrade protobuf
+# Verify topic base matches
+# Server config.json and HA integration must use same topic_base
 ```
 
 **Issue 3: High latency**
 ```bash
 # Check network latency
-docker exec -it homeassistant ping localhost
+ping -c 10 192.168.1.50
 
-# Check Kafka performance
-docker exec -it kafka kafka-broker-api-versions --bootstrap-server localhost:9092
+# Check MQTT QoS setting
+# QoS 1 (at least once) recommended for reliability
+
+# Check HA system load
+# Reduce other integrations or increase resources
 ```
 
 ---
 
-## Migration to Ubuntu Server (Plan B)
+## Migration to Production
 
-If HA Test struggles with resources or you want to separate concerns:
+When testing is successful on HA Test:
 
 ### Quick Migration Steps
 
-1. **Deploy to Ubuntu Server**:
+1. **On Production HA**:
+   - Install Mosquitto add-on (if not installed)
+   - Copy custom component files
+   - Add integration via UI
+
+2. **Update server config** (if HA IP differs):
+   ```json
+   {
+     "mqtt": {
+       "broker": "PRODUCTION_HA_IP:1883"
+     }
+   }
+   ```
+
+3. **Restart Fleet Telemetry**:
    ```bash
-   # On Ubuntu Server
-   cd /opt
-   git clone https://github.com/jjtortosa/seitor-tesla-telemetry.git
-   cd seitor-tesla-telemetry/server
-   docker-compose up -d
+   docker compose restart fleet-telemetry
    ```
 
-2. **Update HA configuration**:
-   ```yaml
-   # In HA Test configuration.yaml
-   tesla_telemetry_local:
-     kafka_broker: "UBUNTU_SERVER_IP:9092"  # Changed from localhost
-     # rest stays the same
-   ```
-
-3. **Restart HA**:
-   ```bash
-   ha core restart
-   ```
-
-4. **Stop services on HA Test**:
-   ```bash
-   # On HA Test
-   cd /opt/seitor-tesla-telemetry/server
-   docker-compose down
-   ```
-
-**That's it!** The integration will now connect to Ubuntu Server instead.
+4. **Copy automations** from HA Test to Production
 
 ---
 
@@ -578,8 +516,8 @@ If HA Test struggles with resources or you want to separate concerns:
 
 Before considering testing complete, verify:
 
-- [ ] ✅ Kafka receives messages from Tesla
-- [ ] ✅ Protobuf parsing works without errors
+- [ ] ✅ MQTT receives messages from Tesla (via Fleet Telemetry)
+- [ ] ✅ JSON parsing works without errors
 - [ ] ✅ All 13 entities created and updating
 - [ ] ✅ Latency <5 seconds
 - [ ] ✅ Automations trigger correctly
@@ -601,13 +539,13 @@ Before considering testing complete, verify:
    - Charging schedules
    - Location-based automations
 
-3. **Consider migration to HA Real**:
+3. **Consider migration to Production HA**:
    - Repeat Phase 2 on production HA
    - Copy tested automations
    - Monitor for 1 week
 
 4. **Optional enhancements**:
-   - Add more sensors from Protobuf fields
+   - Add more sensors from telemetry fields
    - Create Lovelace dashboard
    - Set up alerts for anomalies
 
@@ -616,6 +554,6 @@ Before considering testing complete, verify:
 **Happy Testing!** 🚗⚡
 
 If you encounter issues, check:
-- `/config/home-assistant.log` on HA Test
-- `docker-compose logs -f` for server stack
-- `tools/testing/kafka_debugger.py` for raw Kafka messages
+- `/config/home-assistant.log` on Home Assistant
+- `docker compose logs -f` for server stack
+- `mosquitto_sub -h localhost -t "tesla/#" -v` for raw MQTT messages

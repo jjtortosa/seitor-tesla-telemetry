@@ -1,12 +1,12 @@
 # Troubleshooting Guide
 
-Comprehensive troubleshooting guide for Tesla Fleet Telemetry self-hosted system.
+Comprehensive troubleshooting guide for Tesla Fleet Telemetry self-hosted system with MQTT.
 
 ## Quick Diagnostics
 
 ### System Health Check
 
-Run this command on your Proxmox container to get overall system status:
+Run this command on your server to get overall system status:
 
 ```bash
 cd /opt/tesla-telemetry/server
@@ -17,22 +17,22 @@ docker compose ps
 # Check logs for errors
 docker compose logs --tail=100 | grep -i error
 
-# Test Kafka
-docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
+# Test MQTT connectivity
+mosquitto_sub -h YOUR_MQTT_BROKER -t "tesla/#" -v -C 1
 
 # Test certificate
-./scripts/validate_cert.sh tesla-telemetry.seitor.com
+./scripts/validate_cert.sh tesla-telemetry.yourdomain.com
 
 # Check fleet-telemetry health
-curl http://localhost:8443/health
+curl -k https://localhost:443/health
 ```
 
 **Healthy system output**:
-- All containers: `Up` + `healthy`
+- Fleet Telemetry container: `Up` + `healthy`
 - No ERROR messages in logs
-- Kafka topics listed successfully
+- MQTT broker reachable
 - Certificate validation passes
-- Health endpoint returns: `OK`
+- Health endpoint returns: `{"status": "ok"}`
 
 ---
 
@@ -41,7 +41,7 @@ curl http://localhost:8443/health
 ### DNS Not Resolving
 
 **Symptoms**:
-- `nslookup tesla-telemetry.seitor.com` fails
+- `nslookup tesla-telemetry.yourdomain.com` fails
 - Cannot access domain from browser
 - Certificate validation fails with DNS error
 
@@ -49,13 +49,13 @@ curl http://localhost:8443/health
 
 ```bash
 # Test DNS resolution
-nslookup tesla-telemetry.seitor.com
+nslookup tesla-telemetry.yourdomain.com
 
 # Test from different DNS server
-nslookup tesla-telemetry.seitor.com 8.8.8.8
+nslookup tesla-telemetry.yourdomain.com 8.8.8.8
 
 # Check DNS propagation
-dig tesla-telemetry.seitor.com +trace
+dig tesla-telemetry.yourdomain.com +trace
 ```
 
 **Solutions**:
@@ -85,7 +85,7 @@ dig tesla-telemetry.seitor.com +trace
 ### Port 443 Not Accessible
 
 **Symptoms**:
-- `nc -zv tesla-telemetry.seitor.com 443` fails from outside network
+- `nc -zv tesla-telemetry.yourdomain.com 443` fails from outside network
 - Certificate validation fails on connectivity
 - Vehicle cannot connect
 
@@ -96,16 +96,16 @@ dig tesla-telemetry.seitor.com +trace
 nc -zv localhost 443
 
 # Test from LAN (should work)
-nc -zv 192.168.5.105 443
+nc -zv 192.168.1.50 443
 
 # Test from outside (use phone hotspot or https://www.yougetsignal.com/tools/open-ports/)
-nc -zv tesla-telemetry.seitor.com 443
+nc -zv tesla-telemetry.yourdomain.com 443
 ```
 
 **Solutions**:
 
 1. **Check port forwarding on router**:
-   - Rule: WAN 443 → LAN 192.168.5.105:443
+   - Rule: WAN 443 → LAN 192.168.1.50:443
    - Protocol: TCP
    - Enabled: ✅
 
@@ -146,10 +146,10 @@ nc -zv tesla-telemetry.seitor.com 443
 
 ```bash
 # Validate certificate
-./scripts/validate_cert.sh tesla-telemetry.seitor.com
+./scripts/validate_cert.sh tesla-telemetry.yourdomain.com
 
 # Check certificate details
-openssl s_client -connect tesla-telemetry.seitor.com:443 -servername tesla-telemetry.seitor.com
+openssl s_client -connect tesla-telemetry.yourdomain.com:443 -servername tesla-telemetry.yourdomain.com
 
 # Check certificate files exist
 ls -la certs/
@@ -229,7 +229,7 @@ docker compose run --rm fleet-telemetry sh
    ls -la certs/fullchain.pem certs/privkey.pem
 
    # If missing, copy from Let's Encrypt
-   cp /etc/letsencrypt/live/tesla-telemetry.seitor.com/*.pem certs/
+   cp /etc/letsencrypt/live/tesla-telemetry.yourdomain.com/*.pem certs/
    ```
 
 3. **Port already in use**:
@@ -240,76 +240,80 @@ docker compose run --rm fleet-telemetry sh
    # Kill process or change port
    ```
 
-4. **Kafka not ready**:
+4. **MQTT broker not reachable**:
    ```bash
-   # Check Kafka is healthy first
-   docker compose ps kafka
+   # Test MQTT connectivity from server
+   nc -zv 192.168.1.50 1883
 
-   # If unhealthy, check Kafka logs
-   docker compose logs kafka
+   # Check if credentials are correct in config.json
    ```
 
 ---
 
-### Kafka Connection Issues
+### MQTT Connection Issues
 
 **Symptoms**:
-- Fleet-telemetry logs: `Kafka connection failed`
-- No messages in Kafka topic
-- Kafka UI shows no topics
+- Fleet-telemetry logs: `MQTT connection failed`
+- No messages arriving at MQTT broker
+- Home Assistant not receiving data
 
 **Diagnosis**:
 
 ```bash
-# Check Kafka is running
-docker compose ps kafka
+# Check MQTT broker is accessible
+nc -zv 192.168.1.50 1883
 
-# Check Kafka logs
-docker compose logs kafka | tail -50
+# Test MQTT connection with mosquitto
+mosquitto_sub -h 192.168.1.50 -t "test/#" -v
 
-# Test Kafka from inside container
-docker exec -it kafka kafka-broker-api-versions --bootstrap-server localhost:9092
-
-# Test Kafka from fleet-telemetry
-docker compose exec fleet-telemetry sh
-nc -zv kafka 9092
+# Check fleet-telemetry logs for MQTT errors
+docker compose logs fleet-telemetry | grep -i "mqtt\|broker\|connect"
 ```
 
 **Solutions**:
 
-1. **Kafka not started**:
+1. **MQTT broker not running**:
    ```bash
-   docker compose restart kafka
-   docker compose logs -f kafka
+   # Check Mosquitto add-on in Home Assistant
+   # Settings → Add-ons → Mosquitto broker → Check status
+
+   # Or from HA terminal
+   ha addons info core_mosquitto
    ```
 
-2. **Zookeeper issues**:
+2. **Invalid credentials**:
    ```bash
-   # Kafka depends on Zookeeper
-   docker compose restart zookeeper
-   docker compose restart kafka
+   # Test credentials manually
+   mosquitto_sub -h 192.168.1.50 -u mqtt_user -P mqtt_password -t "test"
+
+   # If fails, check Mosquitto add-on configuration for correct username/password
    ```
 
-3. **Network issues**:
+3. **Firewall blocking port 1883**:
    ```bash
+   # On MQTT broker host (HA)
+   ufw allow 1883/tcp
+
+   # Or check if Mosquitto is binding to all interfaces
+   # In Mosquitto config: listener 1883 0.0.0.0
+   ```
+
+4. **Wrong broker address**:
+   ```bash
+   # Check config.json has correct MQTT broker address
+   grep -A 5 '"mqtt"' config.json
+
+   # Should match your Home Assistant IP
+   ```
+
+5. **Network connectivity**:
+   ```bash
+   # From fleet-telemetry server, ping MQTT broker
+   ping -c 3 192.168.1.50
+
    # Check Docker network
    docker network ls
    docker network inspect server_tesla-net
-
-   # Recreate network
-   docker compose down
-   docker compose up -d
-   ```
-
-4. **Kafka disk space full**:
-   ```bash
-   # Check volume usage
-   docker system df -v
-
-   # Clean old data
-   docker compose down
-   docker volume rm server_kafka-data
-   docker compose up -d
    ```
 
 ---
@@ -320,7 +324,7 @@ nc -zv kafka 9092
 
 **Symptoms**:
 - No connection logs in fleet-telemetry
-- No messages in Kafka
+- No messages arriving at MQTT broker
 - Vehicle shows connected in Tesla app but not to telemetry
 
 **Diagnosis**:
@@ -336,7 +340,7 @@ docker compose logs -f fleet-telemetry | grep -i "connect\|vehicle\|tls"
 # Check if port 443 accessible from internet
 # Use: https://www.yougetsignal.com/tools/open-ports/
 # Or from phone hotspot:
-nc -zv tesla-telemetry.seitor.com 443
+nc -zv tesla-telemetry.yourdomain.com 443
 ```
 
 **Solutions**:
@@ -344,14 +348,15 @@ nc -zv tesla-telemetry.seitor.com 443
 1. **Virtual key not paired**:
    - Open Tesla app → Vehicle → Keys
    - Should show: "Fleet Telemetry Key"
-   - If missing, re-pair: https://tesla.com/_ak/tesla-telemetry.seitor.com
+   - If missing, re-pair: https://tesla.com/_ak/tesla-telemetry.yourdomain.com
 
 2. **Telemetry config not sent**:
    ```bash
    # Resend telemetry configuration
    curl -X POST \
-     "https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/vehicles/${VEHICLE_ID}/command/fleet_telemetry_config" \
+     "https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/vehicles/${VEHICLE_ID}/fleet_telemetry_config" \
      -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+     -H "Content-Type: application/json" \
      -d @telemetry_config.json
    ```
 
@@ -368,10 +373,10 @@ nc -zv tesla-telemetry.seitor.com 443
 5. **Public key verification failed**:
    ```bash
    # Test public key URL
-   curl https://tesla-telemetry.seitor.com/.well-known/appspecific/com.tesla.3p.public-key.pem
+   curl https://tesla-telemetry.yourdomain.com/.well-known/appspecific/com.tesla.3p.public-key.pem
 
    # Should return PEM-formatted key
-   # If 404, check Nginx config
+   # If 404, check Nginx config or Fleet Telemetry public key serving
    ```
 
 ---
@@ -388,8 +393,9 @@ nc -zv tesla-telemetry.seitor.com 443
 ```bash
 # Check API response
 curl -X POST \
-  "https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/vehicles/${VEHICLE_ID}/command/fleet_telemetry_config" \
+  "https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/vehicles/${VEHICLE_ID}/fleet_telemetry_config" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "Content-Type: application/json" \
   -d @telemetry_config.json \
   -v
 
@@ -407,7 +413,7 @@ jq . telemetry_config.json
    ```
 
 2. **Invalid field names**:
-   - Check Tesla's Protobuf schema for valid field names
+   - Check Tesla's telemetry documentation for valid field names
    - Common typo: `Location` (correct) vs `location` (incorrect)
 
 3. **Invalid intervals**:
@@ -425,7 +431,7 @@ jq . telemetry_config.json
 5. **Hostname mismatch**:
    ```json
    {
-     "hostname": "tesla-telemetry.seitor.com"  // Must match server cert CN
+     "hostname": "tesla-telemetry.yourdomain.com"  // Must match server cert CN
    }
    ```
 
@@ -435,23 +441,19 @@ jq . telemetry_config.json
 
 **Symptoms**:
 - Fleet-telemetry shows vehicle connected
-- But no messages arriving in Kafka
+- But no messages arriving at MQTT broker
 - Or messages arriving but empty
 
 **Diagnosis**:
 
 ```bash
 # Check fleet-telemetry logs for message processing
-docker compose logs fleet-telemetry | grep -i "received\|message\|telemetry"
+docker compose logs fleet-telemetry | grep -i "received\|message\|telemetry\|mqtt"
 
-# Check Kafka for messages
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server localhost:9092 \
-  --topic tesla_telemetry \
-  --max-messages 10
+# Check MQTT for messages
+mosquitto_sub -h 192.168.1.50 -u mqtt_user -P mqtt_password -t "tesla/#" -v
 
-# Check Kafka UI
-# Open: http://192.168.5.105:8080
+# Wait for vehicle to send data (may take a few minutes)
 ```
 
 **Solutions**:
@@ -476,12 +478,12 @@ docker exec -it kafka kafka-console-consumer \
    }
    ```
 
-4. **Kafka topic full**:
+4. **MQTT QoS issues**:
    ```bash
-   # Check Kafka disk usage
-   docker exec -it kafka df -h /var/lib/kafka/data
+   # Verify QoS setting in config.json
+   grep -A 10 '"mqtt"' config.json
 
-   # Increase retention or clean old data
+   # QoS 1 (at least once) is recommended for reliability
    ```
 
 ---
@@ -492,7 +494,7 @@ docker exec -it kafka kafka-console-consumer \
 
 **Symptoms**:
 - HA logs show: `Error loading custom_components.tesla_telemetry_local`
-- Integration not listed in Integrations page
+- Integration not listed in Add Integration page
 - No entities created
 
 **Diagnosis**:
@@ -501,28 +503,27 @@ docker exec -it kafka kafka-console-consumer \
 # Check HA logs
 tail -f /config/home-assistant.log | grep tesla_telemetry_local
 
-# Check Python dependencies
-docker exec -it homeassistant python3 -c "import kafka; import google.protobuf"
-
 # Check file permissions
 ls -la /config/custom_components/tesla_telemetry_local/
 ```
 
 **Solutions**:
 
-1. **Missing dependencies**:
+1. **Missing files**:
    ```bash
-   # Install in HA container
-   docker exec -it homeassistant pip3 install kafka-python==2.0.2 protobuf>=5.27.0
+   # Ensure all files are present
+   ls -la /config/custom_components/tesla_telemetry_local/
 
-   # Restart HA
-   ha core restart
+   # Should include: __init__.py, manifest.json, config_flow.py,
+   #                 sensor.py, binary_sensor.py, device_tracker.py,
+   #                 mqtt_client.py, const.py, strings.json, translations/
    ```
 
 2. **Syntax error in Python files**:
    ```bash
    # Check for syntax errors
    python3 -m py_compile /config/custom_components/tesla_telemetry_local/__init__.py
+   python3 -m py_compile /config/custom_components/tesla_telemetry_local/mqtt_client.py
    ```
 
 3. **Missing manifest.json**:
@@ -534,6 +535,41 @@ ls -la /config/custom_components/tesla_telemetry_local/
 4. **HA version incompatible**:
    - Check manifest.json: `"homeassistant": "2024.1.0"`
    - Update HA if too old
+
+5. **MQTT integration not configured**:
+   - Go to Settings → Devices & Services
+   - Ensure MQTT integration is set up and connected to Mosquitto
+
+---
+
+### Integration Not Found in Add Integration
+
+**Symptoms**:
+- "Tesla Fleet Telemetry Local" doesn't appear when searching
+
+**Solutions**:
+
+1. **Files not copied correctly**:
+   ```bash
+   # Verify directory structure
+   ls -la /config/custom_components/tesla_telemetry_local/
+
+   # Should show all .py files
+   ```
+
+2. **Restart Home Assistant**:
+   ```bash
+   ha core restart
+   ```
+
+3. **Check HA logs for import errors**:
+   ```bash
+   grep -i "tesla_telemetry_local" /config/home-assistant.log | head -20
+   ```
+
+4. **Clear browser cache**:
+   - Hard refresh: Ctrl+Shift+R (Cmd+Shift+R on Mac)
+   - Try incognito/private window
 
 ---
 
@@ -547,51 +583,41 @@ ls -la /config/custom_components/tesla_telemetry_local/
 **Diagnosis**:
 
 ```bash
-# Check Kafka connectivity from HA
-docker exec -it homeassistant nc -zv 192.168.5.105 9092
+# Check MQTT messages are arriving
+mosquitto_sub -h localhost -t "tesla/#" -v
 
-# Check integration logs
-tail -f /config/home-assistant.log | grep tesla_telemetry_local
-
-# Enable debug logging
+# Check integration logs with debug
 # Add to configuration.yaml:
 # logger:
 #   logs:
 #     custom_components.tesla_telemetry_local: debug
+
+# Restart HA and check logs
+tail -f /config/home-assistant.log | grep tesla_telemetry_local
 ```
 
 **Solutions**:
 
-1. **Kafka unreachable**:
+1. **MQTT not connected**:
+   - Check MQTT integration status in HA
+   - Settings → Devices & Services → MQTT → should show "Connected"
+
+2. **Wrong topic base**:
+   - Check integration configuration matches server config
+   - Topic base should be `tesla` (or whatever configured in server)
+
+3. **VIN mismatch**:
+   - Check VIN in integration matches vehicle sending data
+   - VINs are case-sensitive
+
+4. **No messages from vehicle**:
    ```bash
-   # Check firewall allows port 9092
-   # On Proxmox container:
-   ufw allow 9092/tcp
+   # Monitor MQTT directly
+   mosquitto_sub -h localhost -t "tesla/#" -v
 
-   # Or disable firewall temporarily to test
-   ufw disable
+   # If no messages, check fleet-telemetry server
+   # Wake vehicle and wait 5-10 minutes
    ```
-
-2. **Wrong Kafka broker IP**:
-   ```yaml
-   # In configuration.yaml
-   tesla_telemetry_local:
-     kafka_broker: "192.168.5.105:9092"  # Must be container IP
-   ```
-
-3. **Protobuf parsing fails**:
-   ```bash
-   # Check logs for decode errors
-   grep -i "protobuf\|decode" /config/home-assistant.log
-
-   # Recompile Protobuf if needed
-   protoc --python_out=. vehicle_data.proto
-   ```
-
-4. **Consumer lag**:
-   - Check Kafka UI: Topics → tesla_telemetry → Consumer Groups
-   - Look for lag (messages not consumed)
-   - Restart HA to reset consumer
 
 ---
 
@@ -610,18 +636,16 @@ tail -f /config/home-assistant.log | grep tesla_telemetry_local
 # 2. Check HA entity update time
 # 3. Calculate difference
 
-# Check Kafka UI for consumer lag
-
 # Check HA system load
 docker exec -it homeassistant top
 ```
 
 **Solutions**:
 
-1. **Kafka consumer lag**:
-   - Check Kafka UI → Consumer Groups
-   - Increase `max_poll_records` in integration config
-   - Add more consumer threads
+1. **MQTT QoS too low**:
+   - QoS 0: No guarantee (fastest but unreliable)
+   - QoS 1: At least once (recommended)
+   - QoS 2: Exactly once (slowest)
 
 2. **HA overloaded**:
    - Increase Docker container resources (CPU/RAM)
@@ -631,16 +655,15 @@ docker exec -it homeassistant top
 3. **Network latency**:
    ```bash
    # Test latency
-   ping -c 10 192.168.5.105
+   ping -c 10 192.168.1.50
 
    # Should be <1ms on LAN
    # If higher, check network issues
    ```
 
-4. **Protobuf parsing slow**:
-   - Profile parsing time
-   - Consider caching parsed messages
-   - Use compiled Protobuf (not pure Python)
+4. **Vehicle telemetry intervals too long**:
+   - Check telemetry_config.json field intervals
+   - Reduce `interval_seconds` for critical fields
 
 ---
 
@@ -715,7 +738,6 @@ ls -la /opt/tesla-telemetry/server/scripts/refresh_token.sh
 **Symptoms**:
 - Docker containers use 80-100% CPU
 - Server becomes unresponsive
-- Kafka lag increases
 
 **Diagnosis**:
 
@@ -724,21 +746,21 @@ ls -la /opt/tesla-telemetry/server/scripts/refresh_token.sh
 docker stats
 
 # Check which process
-docker exec -it <container> top
+docker exec -it fleet-telemetry top
 ```
 
 **Solutions**:
 
-1. **Kafka processing too many messages**:
+1. **Too many messages**:
    - Reduce telemetry intervals in vehicle config
-   - Increase retention (delete old messages)
+   - Increase `interval_seconds` for less critical fields
 
 2. **Fleet-telemetry parsing issues**:
-   - Check for Protobuf decode errors
+   - Check for JSON parsing errors
    - Reduce log level from debug to info
 
 3. **Insufficient resources**:
-   - Increase Proxmox container CPU allocation
+   - Increase container CPU allocation
    - Increase RAM allocation
 
 ---
@@ -748,7 +770,7 @@ docker exec -it <container> top
 **Symptoms**:
 - Out of memory errors
 - Containers restarting
-- Kafka becomes slow
+- System becomes slow
 
 **Diagnosis**:
 
@@ -756,31 +778,27 @@ docker exec -it <container> top
 # Check memory usage
 free -h
 docker stats
-
-# Check Kafka memory
-docker exec -it kafka java -XshowSettings:vm -version
 ```
 
 **Solutions**:
 
-1. **Kafka buffer too large**:
-   ```yaml
-   # In docker-compose.yml, add:
-   environment:
-     KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
-   ```
+1. **Reduce message retention**:
+   - MQTT doesn't retain all messages by default
+   - Check `retained` setting in config.json
 
-2. **Too many messages retained**:
+2. **Increase container memory**:
    ```bash
-   # Reduce retention hours
+   # Increase Docker container memory limit
    # In docker-compose.yml:
-   KAFKA_LOG_RETENTION_HOURS: 24  # Instead of 168
+   deploy:
+     resources:
+       limits:
+         memory: 1G
    ```
 
-3. **Increase container memory**:
-   ```bash
-   # In Proxmox: CT → Resources → Memory → Increase to 8GB
-   ```
+3. **Restart periodically**:
+   - If memory leaks, schedule periodic restarts
+   - Use healthcheck with restart policy
 
 ---
 
@@ -800,14 +818,14 @@ docker compose version
 docker compose ps
 docker compose logs --tail=100 > debug_logs.txt
 
-# Kafka status
-docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092 > kafka_topics.txt
+# MQTT connectivity test
+mosquitto_sub -h YOUR_MQTT_BROKER -t "tesla/#" -v -C 5 > mqtt_messages.txt
 
 # Certificate info
-./scripts/validate_cert.sh tesla-telemetry.seitor.com > cert_validation.txt
+./scripts/validate_cert.sh tesla-telemetry.yourdomain.com > cert_validation.txt
 
 # Configuration (REDACT SECRETS!)
-cat config.json | jq 'del(.tls.server_key)' > config_sanitized.json
+cat config.json | jq 'del(.mqtt.password) | del(.tls.server_key)' > config_sanitized.json
 ```
 
 ### Where to Get Help
@@ -851,16 +869,22 @@ Include:
 
 4. Check certificate expiry:
    ```bash
-   ./scripts/validate_cert.sh tesla-telemetry.seitor.com
+   ./scripts/validate_cert.sh tesla-telemetry.yourdomain.com
    ```
 
 5. Check public IP hasn't changed (if using DDNS):
    ```bash
    curl ifconfig.me
-   # Compare with DNS: nslookup tesla-telemetry.seitor.com
+   # Compare with DNS: nslookup tesla-telemetry.yourdomain.com
    ```
 
-6. Full system restart:
+6. Check MQTT broker is running:
+   ```bash
+   # In Home Assistant
+   # Settings → Add-ons → Mosquitto broker → Check status
+   ```
+
+7. Full system restart:
    ```bash
    docker compose down
    docker compose up -d

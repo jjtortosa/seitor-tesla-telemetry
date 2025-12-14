@@ -66,9 +66,9 @@ A complete self-hosted solution for streaming real-time Tesla vehicle data to Ho
 
 **Protocol**: WebSocket with mutual TLS (mTLS)
 **Frequency**: Configured per field (e.g., location every 5s, shift state every 1s)
-**Format**: Protocol Buffers (Protobuf)
+**Format**: JSON (converted by Fleet Telemetry server)
 
-When configured, the Tesla vehicle establishes a persistent WebSocket connection to the Fleet Telemetry server. The vehicle sends binary Protobuf messages containing the requested data fields.
+When configured, the Tesla vehicle establishes a persistent WebSocket connection to the Fleet Telemetry server. The server converts the data to JSON and publishes to MQTT topics.
 
 **Example message fields**:
 - `Location` (lat, lon, heading)
@@ -79,7 +79,7 @@ When configured, the Tesla vehicle establishes a persistent WebSocket connection
 
 ### 2. Fleet Telemetry Server → MQTT
 
-The server validates the mTLS certificate, parses the Protobuf message, and publishes it to MQTT topics:
+The server validates the mTLS certificate, converts the data to JSON, and publishes it to MQTT topics:
 
 - **`tesla/<VIN>/v/<field>`**: Vehicle data (location, speed, etc.)
 - **`tesla/<VIN>/connectivity`**: Connection events (connected, disconnected)
@@ -128,8 +128,8 @@ automation:
 **Responsibilities**:
 - Accept WebSocket connections from Tesla vehicles
 - Validate client certificates (mTLS)
-- Parse Protobuf messages
-- Forward to MQTT broker
+- Convert data to JSON format
+- Publish to MQTT broker
 - Expose metrics for monitoring
 
 **Resource Requirements**:

@@ -414,7 +414,7 @@ mkdir -p /opt/tesla-telemetry
 cd /opt/tesla-telemetry
 
 # Create subdirectories
-mkdir -p certs config scripts logs kafka-data zookeeper-data
+mkdir -p certs config scripts logs
 
 # Set permissions
 chmod 755 /opt/tesla-telemetry

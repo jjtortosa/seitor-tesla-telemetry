@@ -283,17 +283,6 @@ mosquitto_pub -h 192.168.5.201 -u user -P pass -t "test" -m "hello"
    nc -zv tesla-telemetry.seitor.com 443
    ```
 
-## Migration from Kafka (v1.x)
-
-If upgrading from the Kafka-based version:
-
-1. Stop current stack: `docker compose down`
-2. Update config files (see examples above)
-3. Remove Kafka volumes: `docker volume rm server_kafka-data server_zookeeper-data`
-4. Start new stack: `docker compose up -d`
-
-**Note**: No data migration needed - telemetry is real-time streaming.
-
 ## Next Steps
 
 1. Configure virtual key pairing (see main docs)

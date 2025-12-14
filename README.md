@@ -6,25 +6,27 @@ Self-hosted Tesla Fleet Telemetry server with custom Home Assistant integration 
 
 ## ⚠️ Difficulty Warning
 
-> **This is an ADVANCED project.** Estimated setup time: **8-12 hours**.
+> **This is a MODERATE-ADVANCED project.** Estimated setup time: **4-6 hours**.
 
 ### You SHOULD attempt this if you:
-- ✅ Have experience with Docker, Linux, and command line
-- ✅ Understand networking (DNS, port forwarding, SSL certificates)
-- ✅ Own a server (Proxmox, Synology, VPS, etc.)
+- ✅ Have experience with Docker and command line
+- ✅ Understand basic networking (DNS, port forwarding)
+- ✅ Own a server or VPS with public IP
 - ✅ Have a domain name you control
-- ✅ Are comfortable debugging complex systems
-- ✅ Want full control and don't mind the effort
+- ✅ Are comfortable following technical documentation
 
 ### You should NOT attempt this if you:
-- ❌ Only install integrations via HACS with one click
 - ❌ Have never used SSH or a terminal
-- ❌ Don't have your own server infrastructure
-- ❌ Expect it to "just work" without troubleshooting
+- ❌ Don't have server infrastructure or a VPS
+- ❌ Expect one-click installation
 
 ### Easier Alternative
 
-**[Teslemetry.com](https://teslemetry.com)** - $5/month, 30-minute setup, same real-time data. Seriously consider this if you value your time.
+**[Teslemetry.com](https://teslemetry.com)** - $5/month, 30-minute setup, same real-time data. Consider this if you prefer managed services.
+
+### AI-Assisted Setup
+
+**New to self-hosting?** Use our [AI Setup Assistant](ai-assistant/) with Claude, ChatGPT, or Copilot. The AI will guide you step-by-step through the entire process, help troubleshoot issues, and answer questions in real-time. This can reduce setup time significantly.
 
 ### Requirements Summary
 
@@ -32,12 +34,13 @@ Self-hosted Tesla Fleet Telemetry server with custom Home Assistant integration 
 |-------------|------------|
 | Tesla Developer account (partner registration) | 🟡 Medium |
 | Public domain + Let's Encrypt SSL | 🟡 Medium |
-| Server running Docker + Fleet Telemetry | 🔴 High |
-| Public port 443 (port forwarding/DDNS) | 🔴 High |
-| EC key pair + virtual key pairing | 🔴 High |
+| Server running Docker + Fleet Telemetry | 🟡 Medium |
+| Public port 443 (port forwarding) | 🟡 Medium |
+| EC key pair + virtual key pairing | 🟡 Medium |
 | OAuth flow + token management | 🟡 Medium |
-| Send telemetry config to vehicle | 🔴 High |
+| Send telemetry config to vehicle | 🟡 Medium |
 | **MQTT broker in Home Assistant** | 🟢 Easy |
+| **HA Integration (Config Flow)** | 🟢 Easy |
 
 ---
 
@@ -258,7 +261,7 @@ tesla/<VIN>/alerts/#            → Alert messages
 
 | Solution | Monthly Cost | Latency | Setup Time | Control |
 |----------|--------------|---------|------------|---------|
-| **This project** | $0 (domain ~$1/mo) | <1s | 8-12h | Full |
+| **This project** | $0 (domain ~$1/mo) | <1s | 4-6h | Full |
 | Teslemetry | $5/month | <1s | 30min | Limited |
 | Tesla Fleet API polling | $0 | 2-15min | 2h | Full |
 
@@ -290,21 +293,6 @@ tesla/<VIN>/alerts/#            → Alert messages
    - Must use Let's Encrypt or Tesla-trusted CA
    - Domain must NOT be behind Cloudflare proxy
 
-## Migration from v1.x (Kafka)
-
-If upgrading from the Kafka-based version:
-
-1. Remove old integration from HA
-2. Install Mosquitto add-on (if not already)
-3. Update Fleet Telemetry server config to use MQTT instead of Kafka
-4. Copy new integration files
-5. Add integration via UI
-
-**Breaking changes in v2.0:**
-- No longer requires `kafka-python` dependency
-- Configuration via UI instead of YAML
-- Requires MQTT integration in Home Assistant
-
 ## Support
 
 This is a personal project for home automation. While documented thoroughly:
@@ -326,12 +314,11 @@ MIT License - see [LICENSE](LICENSE) file
 
 ---
 
-**Status**: ✅ v2.0.0 - MQTT Edition
+**Status**: ✅ v2.0.0 - Production Ready
 
-- ✅ Migrated from Kafka to MQTT (simpler setup)
 - ✅ Uses Home Assistant's native MQTT integration
 - ✅ Config Flow UI (no YAML required)
 - ✅ Real-world tested and working
-- ✅ JSON format (easier debugging)
+- ✅ JSON format (easy debugging)
 - ✅ device_tracker with zone triggers
 - ✅ 13 entities per vehicle
