@@ -132,7 +132,7 @@ class TeslaBinarySensor(BinarySensorEntity):
 
     @callback
     def update_value(self, value: Any, data: dict[str, Any]) -> None:
-        """Update binary sensor value from Kafka message."""
+        """Update binary sensor value from MQTT message."""
         try:
             # Cache all relevant data
             for field in self._depends_on:

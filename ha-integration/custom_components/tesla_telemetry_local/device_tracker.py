@@ -104,7 +104,7 @@ class TeslaDeviceTracker(TrackerEntity):
 
     @callback
     def update_location(self, value: Any, data: dict[str, Any]) -> None:
-        """Update location from Kafka message."""
+        """Update location from MQTT message."""
         try:
             lat: float | None = None
             lon: float | None = None

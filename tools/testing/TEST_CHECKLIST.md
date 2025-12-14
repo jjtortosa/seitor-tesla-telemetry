@@ -1,69 +1,63 @@
 # Tesla Fleet Telemetry - Testing Checklist
 
-Quick checklist for real-world testing on HA Test instance.
+Quick checklist for real-world testing.
 
 ## Pre-Testing Setup
 
 ### Information Gathering
 - [ ] Tesla VIN: `_____________________`
-- [ ] HA Test IP: `_____________________`
+- [ ] Home Assistant IP: `_____________________`
 - [ ] Domain configured: `tesla-telemetry.seitor.com`
-- [ ] SSL certificate ready or will use Let's Encrypt
+- [ ] SSL certificate ready
 - [ ] Tesla Developer setup complete (keys, virtual key)
+- [ ] MQTT broker configured in HA
 
 ### Access Verification
-- [ ] Can SSH/console into HA Test container
-- [ ] Docker installed and working: `docker --version`
-- [ ] Git installed: `git --version`
-- [ ] Ports 9092 and 443 available
+- [ ] Can access Home Assistant UI
+- [ ] Can access Home Assistant logs
+- [ ] MQTT broker running
 
 ---
 
 ## Phase 1: Server Deployment
 
-### Deploy Stack
-- [ ] Clone repository to `/opt/seitor-tesla-telemetry`
-- [ ] SSL certificates in `server/certs/`
-- [ ] Review `server/config.json` (correct hostname)
-- [ ] Run `docker-compose up -d` in `server/`
+### Deploy Fleet Telemetry Stack
+- [ ] Clone repository
+- [ ] SSL certificates in place
+- [ ] Review `config.json` (correct hostname, MQTT settings)
+- [ ] Run `docker-compose up -d`
 - [ ] Verify containers running: `docker-compose ps`
 
 ### Verify Services
-- [ ] Kafka listening on 9092: `netstat -tuln | grep 9092`
 - [ ] HTTPS endpoint working: `curl https://tesla-telemetry.seitor.com/status`
 - [ ] Fleet Telemetry logs show "Server started"
-- [ ] Can connect to Kafka: `nc -zv localhost 9092`
+- [ ] MQTT broker accessible
 
 **Estimated time**: 1-2 hours
-**Blocker**: Cannot proceed without working Kafka
 
 ---
 
 ## Phase 2: HA Integration
 
 ### Install Integration
-- [ ] Access HA container: `docker exec -it homeassistant bash`
 - [ ] Copy integration to `/config/custom_components/tesla_telemetry_local/`
-- [ ] Install dependencies: `pip3 install kafka-python==2.0.2 protobuf>=5.27.0`
-- [ ] Verify: `pip3 list | grep -E "kafka|protobuf"`
+- [ ] Restart Home Assistant
+- [ ] Integration appears in Settings > Integrations
 
-### Configure
-- [ ] Edit `/config/configuration.yaml`
-- [ ] Add tesla_telemetry_local config with:
-  - kafka_broker: `localhost:9092`
-  - vehicle_vin: `YOUR_VIN`
-  - vehicle_name: `MelanY`
-- [ ] Enable debug logging
-- [ ] Restart HA: `ha core restart`
+### Configure via UI
+- [ ] Add integration: Settings > Integrations > Add Integration
+- [ ] Search "Tesla Fleet Telemetry Local"
+- [ ] Enter MQTT topic base: `tesla`
+- [ ] Enter vehicle VIN
+- [ ] Enter vehicle name
+- [ ] Enable debug logging in configuration.yaml
 
 ### Verify Loading
-- [ ] Wait 30 seconds for restart
-- [ ] Check logs: `tail -f /config/home-assistant.log | grep tesla_telemetry_local`
-- [ ] See "Setting up tesla_telemetry_local"
-- [ ] See "Successfully connected to Kafka broker"
+- [ ] Check logs: `grep tesla_telemetry_local home-assistant.log`
+- [ ] See "Setting up Tesla Fleet Telemetry Local integration"
+- [ ] See "Tesla MQTT client started successfully"
 
 **Estimated time**: 30 minutes
-**Blocker**: Cannot proceed without HA loading integration
 
 ---
 
@@ -74,53 +68,53 @@ Quick checklist for real-world testing on HA Test instance.
 - [ ] Wake up vehicle (climate control, or phone app)
 - [ ] Wait 1-2 minutes for telemetry to start
 
-### Monitor Kafka
-- [ ] Terminal 1: Run `tools/testing/kafka_debugger.py --broker localhost:9092`
+### Monitor MQTT
+- [ ] Subscribe to topics: `mosquitto_sub -t "tesla/#" -v`
 - [ ] See messages appearing
 - [ ] Verify VIN matches your vehicle
 - [ ] See fields: Location, VehicleSpeed, Gear, Soc, etc.
 
 ### Monitor HA
-- [ ] Terminal 2: `tail -f /config/home-assistant.log | grep tesla_telemetry_local`
-- [ ] See "Received telemetry message"
+- [ ] Check HA logs for tesla_telemetry_local
+- [ ] See "Received telemetry" messages
 - [ ] See field parsing (Location, Speed, Battery, etc.)
 - [ ] No parse errors
 
 **Estimated time**: 30 minutes
-**Blocker**: Cannot proceed without messages
 
 ---
 
 ## Phase 4: Entity Verification
 
 ### Check Entities Exist
-- [ ] Run: `ha state list | grep melany`
+- [ ] Go to Settings > Devices & Services
+- [ ] Find "Tesla Fleet Telemetry Local"
 - [ ] Count entities: Should be 13 total
   - 1 device_tracker
   - 8 sensors
   - 4 binary_sensors
 
 ### Verify Device Tracker
-- [ ] `ha state get device_tracker.melany_location`
+- [ ] `device_tracker.VEHICLENAME_location`
 - [ ] Has latitude/longitude
 - [ ] Shows on HA map
 - [ ] Updates when vehicle moves
 
 ### Verify Sensors
-- [ ] `sensor.melany_speed` (km/h, changes when driving)
-- [ ] `sensor.melany_shift_state` (P/D/R/N)
-- [ ] `sensor.melany_battery` (%, matches vehicle display)
-- [ ] `sensor.melany_range` (km, estimated range)
-- [ ] `sensor.melany_charging_state`
-- [ ] `sensor.melany_charger_voltage` (V, when charging)
-- [ ] `sensor.melany_charger_current` (A, when charging)
-- [ ] `sensor.melany_odometer` (km)
+- [ ] `sensor.VEHICLENAME_speed` (km/h, changes when driving)
+- [ ] `sensor.VEHICLENAME_shift_state` (P/D/R/N)
+- [ ] `sensor.VEHICLENAME_battery` (%, matches vehicle display)
+- [ ] `sensor.VEHICLENAME_range` (km, estimated range)
+- [ ] `sensor.VEHICLENAME_charging_state`
+- [ ] `sensor.VEHICLENAME_charger_voltage` (V, when charging)
+- [ ] `sensor.VEHICLENAME_charger_current` (A, when charging)
+- [ ] `sensor.VEHICLENAME_odometer` (km)
 
 ### Verify Binary Sensors
-- [ ] `binary_sensor.melany_driving` (on when moving)
-- [ ] `binary_sensor.melany_charging` (on when plugged in)
-- [ ] `binary_sensor.melany_charge_port_open`
-- [ ] `binary_sensor.melany_connected` (vehicle awake)
+- [ ] `binary_sensor.VEHICLENAME_driving` (on when moving)
+- [ ] `binary_sensor.VEHICLENAME_charging` (on when plugged in)
+- [ ] `binary_sensor.VEHICLENAME_charge_port_open`
+- [ ] `binary_sensor.VEHICLENAME_connected` (vehicle awake)
 
 **Estimated time**: 30 minutes
 
@@ -131,19 +125,19 @@ Quick checklist for real-world testing on HA Test instance.
 ### Scenario 1: Parked
 **Action**: Vehicle parked, locked, not charging
 
-- [ ] `sensor.melany_speed` = 0
-- [ ] `sensor.melany_shift_state` = P
-- [ ] `binary_sensor.melany_driving` = off
-- [ ] `binary_sensor.melany_charging` = off
+- [ ] `sensor.VEHICLENAME_speed` = 0
+- [ ] `sensor.VEHICLENAME_shift_state` = P
+- [ ] `binary_sensor.VEHICLENAME_driving` = off
+- [ ] `binary_sensor.VEHICLENAME_charging` = off
 - [ ] Location stable
 
 ### Scenario 2: Driving
 **Action**: Start driving
 
-- [ ] `sensor.melany_speed` matches dashboard
-- [ ] `sensor.melany_shift_state` = D
-- [ ] `binary_sensor.melany_driving` = on
-- [ ] `device_tracker.melany_location` updates every ~5-10 sec
+- [ ] `sensor.VEHICLENAME_speed` matches dashboard
+- [ ] `sensor.VEHICLENAME_shift_state` = D
+- [ ] `binary_sensor.VEHICLENAME_driving` = on
+- [ ] `device_tracker.VEHICLENAME_location` updates every ~5-10 sec
 - [ ] Latency <5 seconds
 
 **Time actual latency**: _____ seconds
@@ -151,16 +145,16 @@ Quick checklist for real-world testing on HA Test instance.
 ### Scenario 3: Charging
 **Action**: Plug in charger
 
-- [ ] `binary_sensor.melany_charging` = on
-- [ ] `sensor.melany_charging_state` = Charging
-- [ ] `sensor.melany_charger_voltage` shows voltage
-- [ ] `sensor.melany_charger_current` shows amperage
+- [ ] `binary_sensor.VEHICLENAME_charging` = on
+- [ ] `sensor.VEHICLENAME_charging_state` = Charging
+- [ ] `sensor.VEHICLENAME_charger_voltage` shows voltage
+- [ ] `sensor.VEHICLENAME_charger_current` shows amperage
 - [ ] Battery level increases over time
 
 ### Scenario 4: Zones
 **Action**: Drive to work/store/etc.
 
-- [ ] `device_tracker.melany_location` state changes to zone name
+- [ ] `device_tracker.VEHICLENAME_location` state changes to zone name
 - [ ] Zone transitions recorded in history
 - [ ] Zone enter/exit events work
 
@@ -171,16 +165,16 @@ Quick checklist for real-world testing on HA Test instance.
 ## Phase 6: Automations
 
 ### Test Automation 1: Arrival Notification
-- [ ] Create automation in configuration.yaml
+- [ ] Create automation in UI
 - [ ] Drive away from home
 - [ ] Drive back home
-- [ ] Notification appears: "MelanY has arrived"
+- [ ] Notification appears
 
 ### Test Automation 2: Charging Notification
 - [ ] Create automation
 - [ ] Unplug charger
 - [ ] Plug in charger
-- [ ] Notification appears: "MelanY started charging at X%"
+- [ ] Notification appears
 
 ### Test Automation 3: Low Battery Alert
 - [ ] Create automation (threshold: 20%)
@@ -195,14 +189,12 @@ Quick checklist for real-world testing on HA Test instance.
 
 ### 24-Hour Soak Test
 - [ ] Leave system running for 24 hours
-- [ ] Monitor logs for errors: `tail -f /config/home-assistant.log`
-- [ ] Check Docker stats: `docker stats` (no memory leaks)
-- [ ] Verify Kafka consumer lag stays low
+- [ ] Monitor logs for errors
+- [ ] Check no memory leaks
 - [ ] No disconnections or crashes
 
 ### Resource Usage
-- [ ] HA container memory: _______ MB (stable?)
-- [ ] Kafka container memory: _______ MB (stable?)
+- [ ] HA memory usage: _______ MB (stable?)
 - [ ] CPU usage: _______ % (acceptable?)
 
 **Estimated time**: 24 hours passive monitoring
@@ -213,30 +205,28 @@ Quick checklist for real-world testing on HA Test instance.
 
 Mark complete when ALL are true:
 
-- [ ] ✅ Kafka receives messages from Tesla
-- [ ] ✅ Protobuf parsing works (no errors in logs)
-- [ ] ✅ All 13 entities created and updating
-- [ ] ✅ Latency measured: _____ seconds (<5s goal)
-- [ ] ✅ All 4 scenarios tested successfully
-- [ ] ✅ Automations trigger correctly
-- [ ] ✅ System stable for 24+ hours
-- [ ] ✅ No memory leaks or crashes
-- [ ] ✅ Resource usage acceptable
+- [ ] MQTT receives messages from Fleet Telemetry
+- [ ] All entities created and updating
+- [ ] Latency measured: _____ seconds (<5s goal)
+- [ ] All 4 scenarios tested successfully
+- [ ] Automations trigger correctly
+- [ ] System stable for 24+ hours
+- [ ] No memory leaks or crashes
+- [ ] Resource usage acceptable
 
 ---
 
 ## Troubleshooting Quick Reference
 
-### No messages in Kafka
+### No messages in MQTT
 ```bash
 # Check Fleet Telemetry logs
 docker logs -f fleet-telemetry
 
-# Check if vehicle is paired correctly
-# Check Tesla app shows "Data Sharing" enabled
+# Subscribe to MQTT
+mosquitto_sub -h localhost -t "tesla/#" -v
 
-# Verify Kafka is working
-docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
+# Check Tesla app shows "Data Sharing" enabled
 ```
 
 ### HA Integration not loading
@@ -244,54 +234,15 @@ docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
 # Check logs
 tail -f /config/home-assistant.log | grep ERROR
 
-# Verify dependencies
-docker exec -it homeassistant pip3 list | grep -E "kafka|protobuf"
-
-# Check configuration syntax
-docker exec -it homeassistant python3 -m homeassistant --script check_config
+# Check integration status in UI
+# Settings > Integrations > Tesla Fleet Telemetry Local
 ```
 
-### Parse errors
-```bash
-# Check Protobuf version
-docker exec -it homeassistant pip3 show protobuf
-# Must be >=5.27.0
-
-# Update if needed
-docker exec -it homeassistant pip3 install --upgrade protobuf
-
-# Restart HA
-ha core restart
-```
-
-### High latency
-```bash
-# Check network
-docker exec -it homeassistant ping localhost
-
-# Check Kafka consumer lag
-docker exec -it kafka kafka-consumer-groups \
-  --bootstrap-server localhost:9092 \
-  --group ha_tesla_YOUR_VIN \
-  --describe
-```
-
----
-
-## Migration to Ubuntu Server (If Needed)
-
-**When to migrate**:
-- HA Test struggles with resources
-- Want to separate concerns
-- Need more scalability
-
-**How** (Quick):
-1. Deploy stack on Ubuntu Server
-2. Change HA config: `kafka_broker: "UBUNTU_IP:9092"`
-3. Restart HA
-4. Stop services on HA Test
-
-See `docs/07_real_world_testing.md` for details.
+### Entities not updating
+1. Check MQTT messages are arriving
+2. Verify HA logs show message processing
+3. Check topic base matches configuration
+4. Restart Home Assistant
 
 ---
 

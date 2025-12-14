@@ -136,7 +136,7 @@ class TeslaSensor(SensorEntity):
 
     @callback
     def update_value(self, value: Any, data: dict[str, Any]) -> None:
-        """Update sensor value from Kafka message."""
+        """Update sensor value from MQTT message."""
         try:
             # Update state based on field type
             if self._field_name == "Gear":

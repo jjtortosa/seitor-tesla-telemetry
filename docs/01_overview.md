@@ -21,43 +21,33 @@ A complete self-hosted solution for streaming real-time Tesla vehicle data to Ho
 │  │   (Docker Container)          │  │
 │  │   - Receives vehicle data     │  │
 │  │   - Validates mTLS            │  │
-│  │   - Parses Protobuf           │  │
+│  │   - Publishes to MQTT         │  │
 │  └────────────┬──────────────────┘  │
 │               │                      │
-│               ▼                      │
-│  ┌───────────────────────────────┐  │
-│  │   Kafka Message Queue         │  │
-│  │   Topics:                     │  │
-│  │   - tesla_V (vehicle data)    │  │
-│  │   - tesla_connectivity        │  │
-│  │   - tesla_alerts              │  │
-│  └────────────┬──────────────────┘  │
-│               │                      │
-│     Proxmox LXC Container           │
+│     VM/LXC Container                │
 └───────────────┼─────────────────────┘
-                │ Kafka Protocol
+                │ MQTT Protocol
                 │ (Internal network)
                 ▼
 ┌─────────────────────────────────────┐
 │    Home Assistant (ha.seitor.com)   │
 │  ┌───────────────────────────────┐  │
+│  │  Mosquitto MQTT Broker        │  │
+│  │  (Add-on)                     │  │
+│  └────────────┬──────────────────┘  │
+│               │                      │
+│  ┌────────────┴──────────────────┐  │
 │  │  tesla_telemetry_local        │  │
 │  │  (Custom Integration)         │  │
 │  │                               │  │
-│  │  ┌─────────────────────────┐  │  │
-│  │  │  Kafka Consumer         │  │  │
-│  │  │  - Subscribes to topics │  │  │
-│  │  │  - Parses Protobuf      │  │  │
-│  │  │  - Creates HA entities  │  │  │
-│  │  └──────────┬──────────────┘  │  │
-│  │             │                 │  │
-│  │             ▼                 │  │
-│  │  ┌─────────────────────────┐  │  │
-│  │  │  Entity Manager         │  │  │
-│  │  │  - device_tracker       │  │  │
-│  │  │  - sensors              │  │  │
-│  │  │  - binary_sensors       │  │  │
-│  │  └─────────────────────────┘  │  │
+│  │  - Subscribes to MQTT topics  │  │
+│  │  - Parses JSON messages       │  │
+│  │  - Creates HA entities        │  │
+│  │                               │  │
+│  │  Entities:                    │  │
+│  │  - device_tracker             │  │
+│  │  - sensors                    │  │
+│  │  - binary_sensors             │  │
 │  └───────────────────────────────┘  │
 └─────────────────────────────────────┘
                 │
@@ -87,19 +77,19 @@ When configured, the Tesla vehicle establishes a persistent WebSocket connection
 - `Soc` (battery %)
 - `ChargingState` (charging, complete, disconnected)
 
-### 2. Fleet Telemetry Server → Kafka
+### 2. Fleet Telemetry Server → MQTT
 
-The server validates the mTLS certificate, parses the Protobuf message, and publishes it to Kafka topics:
+The server validates the mTLS certificate, parses the Protobuf message, and publishes it to MQTT topics:
 
-- **`tesla_V`**: Vehicle data (location, speed, etc.)
-- **`tesla_connectivity`**: Connection events (connected, disconnected)
-- **`tesla_alerts`**: Vehicle alerts and errors
+- **`tesla/<VIN>/v/<field>`**: Vehicle data (location, speed, etc.)
+- **`tesla/<VIN>/connectivity`**: Connection events (connected, disconnected)
+- **`tesla/<VIN>/alerts`**: Vehicle alerts and errors
 
-### 3. Kafka → Home Assistant Integration
+### 3. MQTT → Home Assistant Integration
 
-The custom HA integration subscribes to Kafka topics as a consumer. When messages arrive:
+The custom HA integration subscribes to MQTT topics. When messages arrive:
 
-1. **Parse Protobuf**: Decode binary message using `vehicle_data.proto`
+1. **Parse JSON**: Decode JSON message from MQTT
 2. **Extract fields**: Location, shift state, speed, etc.
 3. **Update entities**:
    - `device_tracker.melan_y_location` → GPS coordinates
@@ -139,41 +129,40 @@ automation:
 - Accept WebSocket connections from Tesla vehicles
 - Validate client certificates (mTLS)
 - Parse Protobuf messages
-- Forward to message queue (Kafka)
+- Forward to MQTT broker
 - Expose metrics for monitoring
 
 **Resource Requirements**:
 - CPU: 2 cores (mostly idle, spikes during message processing)
-- RAM: 2-4GB (depends on message buffer size)
-- Disk: 10GB (logs + Kafka retention)
+- RAM: 2-4GB
+- Disk: 10GB (logs)
 - Network: Publicly accessible HTTPS endpoint
 
-### Kafka Message Queue
+### MQTT Broker (Mosquitto)
 
-**Technology**: Confluent Kafka (Docker)
+**Technology**: Mosquitto MQTT Broker (Home Assistant Add-on)
 
 **Responsibilities**:
 - Reliable message delivery (vehicle → HA)
-- Buffer messages during HA downtime (up to configured retention)
+- Buffer messages during integration restart
 - Enable multiple consumers (future: dashboards, mobile apps)
-- Persistence for replay/debugging
 
 **Configuration**:
-- Topics: `tesla_V`, `tesla_connectivity`, `tesla_alerts`
-- Retention: 7 days (configurable)
-- Replication: 1 (single broker for home use)
+- Topics: `tesla/<VIN>/v/#`, `tesla/<VIN>/connectivity`, `tesla/<VIN>/alerts/#`
+- QoS: 1 (at least once delivery)
+- Retained: Yes (last known value available on reconnect)
 
 ### Home Assistant Integration
 
 **Technology**: Python custom component
 
 **Files**:
-- `__init__.py`: Integration setup, Kafka consumer lifecycle
+- `__init__.py`: Integration setup, config entry lifecycle
+- `config_flow.py`: UI configuration flow
 - `device_tracker.py`: Location entity
 - `sensor.py`: Speed, shift state, battery, charging sensors
 - `binary_sensor.py`: Driving, charging, connected states
-- `kafka_consumer.py`: Kafka client, message parsing
-- `vehicle_data_pb2.py`: Compiled Protobuf schema
+- `mqtt_client.py`: MQTT subscription and message handling
 
 **Entities Created**:
 
@@ -213,7 +202,7 @@ automation:
 
 ### When to Choose Self-Hosted?
 
-✅ You enjoy learning new technologies (Docker, Kafka, Protobuf)
+✅ You enjoy learning new technologies (Docker, MQTT)
 ✅ You have a home server (Proxmox, NAS, VPS)
 ✅ You value data privacy and control
 ✅ You want to customize beyond standard features
@@ -243,8 +232,7 @@ automation:
 - SSL/TLS certificates (Let's Encrypt)
 
 **Nice to have**:
-- Kafka basics
-- Protocol Buffers
+- MQTT basics
 - Python development
 - Home Assistant custom components
 
@@ -252,9 +240,10 @@ automation:
 
 **Mandatory**:
 - Server/host for Docker (Proxmox CT, VPS, NAS with Docker)
-- Domain name (seitor.com) with DNS control
+- Domain name with DNS control
 - Public IP address or DDNS
 - SSL certificate (Let's Encrypt works)
+- MQTT broker (Mosquitto add-on in HA)
 
 **Recommended**:
 - Proxmox for LXC isolation
@@ -275,9 +264,9 @@ automation:
 
 After completing this project, you should have:
 
-✅ Fleet Telemetry server running on Proxmox
+✅ Fleet Telemetry server running
 ✅ Tesla vehicle streaming data via HTTPS
-✅ Kafka receiving and buffering messages
+✅ MQTT broker receiving messages
 ✅ Home Assistant integration installed
 ✅ Real-time location updates (<1s latency)
 ✅ Garage door automation working reliably
@@ -286,7 +275,7 @@ After completing this project, you should have:
 
 ## Next Steps
 
-1. Read [02 - Infrastructure Setup](02_infrastructure_setup.md) to prepare your Proxmox environment
+1. Read [02 - Infrastructure Setup](02_infrastructure_setup.md) to prepare your environment
 2. Follow [03 - Tesla Developer Setup](03_tesla_developer_setup.md) to configure your Tesla application
 3. Deploy the server using [04 - Server Deployment](04_server_deployment.md)
 4. Install the HA integration via [05 - Home Assistant Integration](05_ha_integration.md)
