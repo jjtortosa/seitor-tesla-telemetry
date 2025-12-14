@@ -38,11 +38,77 @@
     "step": {
       "init": {
         "title": "Tesla Fleet Telemetry Options",
-        "description": "Update the integration settings. The VIN cannot be changed.",
+        "description": "Update the integration settings for your Tesla vehicle.\n\nVIN: {vehicle_vin}",
         "data": {
           "mqtt_topic_base": "MQTT Topic Base",
-          "vehicle_name": "Vehicle Name"
+          "vehicle_name": "Vehicle Name",
+          "configure_telemetry": "Configure Telemetry Intervals"
+        },
+        "data_description": {
+          "configure_telemetry": "Enable to configure how often Tesla sends telemetry data"
         }
+      },
+      "tesla_api": {
+        "title": "Tesla API Connection",
+        "description": "Configure connection to Tesla Fleet API via vehicle-command proxy.\n\nThe proxy handles authentication and request signing.\nDefault: {default_proxy}",
+        "data": {
+          "proxy_url": "Proxy URL",
+          "tesla_token": "Tesla OAuth Token"
+        },
+        "data_description": {
+          "proxy_url": "URL of the vehicle-command HTTP proxy (e.g., https://localhost:4443)",
+          "tesla_token": "Tesla OAuth access token. Auto-detected from tesla_fleet integration if available."
+        }
+      },
+      "preset_select": {
+        "title": "Telemetry Preset",
+        "description": "Choose a telemetry configuration preset or customize individual fields.\n\nPresets optimize data collection for specific use cases.",
+        "data": {
+          "telemetry_preset": "Select Preset"
+        }
+      },
+      "custom_fields": {
+        "title": "Custom Telemetry Fields",
+        "description": "Configure individual field intervals. Set to 'Disabled' to stop receiving that field.\n\nLower intervals = more data usage.",
+        "data": {
+          "interval_Location": "Location (GPS)",
+          "interval_VehicleSpeed": "Speed",
+          "interval_Gear": "Shift State (P/R/N/D)",
+          "interval_Odometer": "Odometer",
+          "interval_Soc": "State of Charge",
+          "interval_BatteryLevel": "Battery Level",
+          "interval_EstBatteryRange": "Estimated Range",
+          "interval_ChargeLimitSoc": "Charge Limit",
+          "interval_ChargeState": "Charge State",
+          "interval_DetailedChargeState": "Detailed Charge State",
+          "interval_InsideTemp": "Interior Temperature",
+          "interval_OutsideTemp": "Exterior Temperature",
+          "interval_DoorState": "Door State",
+          "interval_Locked": "Lock Status",
+          "interval_SentryMode": "Sentry Mode",
+          "interval_TpmsPressureFl": "Tire Pressure (Front Left)",
+          "interval_TpmsPressureFr": "Tire Pressure (Front Right)",
+          "interval_TpmsPressureRl": "Tire Pressure (Rear Left)",
+          "interval_TpmsPressureRr": "Tire Pressure (Rear Right)"
+        }
+      }
+    },
+    "error": {
+      "proxy_url_required": "Proxy URL is required.",
+      "token_required": "Tesla OAuth token is required.",
+      "connection_failed": "Failed to connect to Tesla API. Check proxy URL and token.",
+      "apply_failed": "Failed to apply telemetry configuration to Tesla.",
+      "no_fields_selected": "At least one field must be enabled."
+    }
+  },
+  "selector": {
+    "preset_options": {
+      "options": {
+        "minimal": "Minimal - Low data usage",
+        "driving": "Driving - Optimized for trips",
+        "charging": "Charging - Monitor sessions",
+        "complete": "Complete - All fields",
+        "custom": "Custom - Configure individually"
       }
     }
   }

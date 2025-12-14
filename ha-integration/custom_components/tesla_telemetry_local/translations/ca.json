@@ -38,11 +38,80 @@
     "step": {
       "init": {
         "title": "Opcions Tesla Fleet Telemetry",
-        "description": "Actualitza la configuració de la integració. El VIN no es pot canviar.",
+        "description": "Actualitza la configuració de la integració.\n\nVIN: {vehicle_vin}",
         "data": {
           "mqtt_topic_base": "Topic Base MQTT",
-          "vehicle_name": "Nom del Vehicle"
+          "vehicle_name": "Nom del Vehicle",
+          "configure_telemetry": "Configurar Intervals de Telemetria"
+        },
+        "data_description": {
+          "configure_telemetry": "Activa per configurar amb quina freqüència Tesla envia dades de telemetria"
         }
+      },
+      "tesla_api": {
+        "title": "Connexió API Tesla",
+        "description": "Configura la connexió a l'API Tesla Fleet via proxy vehicle-command.\n\nEl proxy gestiona l'autenticació i la signatura de peticions.",
+        "data": {
+          "proxy_url": "URL del Proxy",
+          "tesla_token": "Token OAuth Tesla"
+        },
+        "data_description": {
+          "proxy_url": "URL del proxy vehicle-command. Si HA corre en Docker, usa la IP del host (p.ex., https://192.168.x.x:4443), no localhost.",
+          "tesla_token": "Token d'accés OAuth de Tesla. Auto-detectat de la integració tesla_fleet si està disponible."
+        }
+      },
+      "preset_select": {
+        "title": "Preset de Telemetria",
+        "description": "Escull un preset de configuració de telemetria o personalitza els camps individualment.\n\nEls presets optimitzen la recollida de dades per a casos d'ús específics.",
+        "data": {
+          "telemetry_preset": "Selecciona Preset"
+        },
+        "data_description": {
+          "telemetry_preset": "Escull un preset predefinit o personalitza"
+        }
+      },
+      "custom_fields": {
+        "title": "Camps de Telemetria Personalitzats",
+        "description": "Configura els intervals de cada camp. Posa 'Desactivat' per deixar de rebre aquell camp.\n\nIntervals més baixos = més consum de dades.",
+        "data": {
+          "interval_Location": "Ubicació (GPS)",
+          "interval_VehicleSpeed": "Velocitat",
+          "interval_Gear": "Marxes (P/R/N/D)",
+          "interval_Odometer": "Quilometratge",
+          "interval_Soc": "Estat de Càrrega",
+          "interval_BatteryLevel": "Nivell de Bateria",
+          "interval_EstBatteryRange": "Autonomia Estimada",
+          "interval_ChargeLimitSoc": "Límit de Càrrega",
+          "interval_ChargeState": "Estat de Càrrega",
+          "interval_DetailedChargeState": "Estat de Càrrega Detallat",
+          "interval_InsideTemp": "Temperatura Interior",
+          "interval_OutsideTemp": "Temperatura Exterior",
+          "interval_DoorState": "Estat de les Portes",
+          "interval_Locked": "Estat del Bloqueig",
+          "interval_SentryMode": "Mode Sentinella",
+          "interval_TpmsPressureFl": "Pressió Roda (Davant Esq.)",
+          "interval_TpmsPressureFr": "Pressió Roda (Davant Dta.)",
+          "interval_TpmsPressureRl": "Pressió Roda (Darrere Esq.)",
+          "interval_TpmsPressureRr": "Pressió Roda (Darrere Dta.)"
+        }
+      }
+    },
+    "error": {
+      "proxy_url_required": "La URL del proxy és obligatòria.",
+      "token_required": "El token OAuth de Tesla és obligatori.",
+      "connection_failed": "No s'ha pogut connectar a l'API Tesla. Comprova la URL del proxy i el token.",
+      "apply_failed": "No s'ha pogut aplicar la configuració de telemetria a Tesla.",
+      "no_fields_selected": "Com a mínim un camp ha d'estar activat."
+    }
+  },
+  "selector": {
+    "preset_options": {
+      "options": {
+        "minimal": "Mínim - Baix consum de dades",
+        "driving": "Conducció - Optimitzat per viatges",
+        "charging": "Càrrega - Monitoritzar sessions",
+        "complete": "Complet - Tots els camps",
+        "custom": "Personalitzat - Configura individualment"
       }
     }
   }
