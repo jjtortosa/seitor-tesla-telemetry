@@ -175,13 +175,22 @@ class TeslaMQTTClient:
         """Handle alerts message.
 
         Topic: <topic_base>/<VIN>/alerts/<alert_name>/current or /history
-        Payload: {"Name": "...", "StartedAt": "...", "EndedAt": "...", "Audiences": [...]}
+        Payload can be:
+        - Dict: {"Name": "...", "StartedAt": "...", "EndedAt": "...", "Audiences": [...]}
+        - List: [{"Name": "...", ...}, ...]
         """
         try:
             payload = json.loads(msg.payload)
-            alert_name = payload.get("Name", "unknown")
 
-            _LOGGER.debug("Vehicle alert: %s", alert_name)
+            # Handle both dict and list formats
+            if isinstance(payload, list):
+                for alert in payload:
+                    if isinstance(alert, dict):
+                        alert_name = alert.get("Name", "unknown")
+                        _LOGGER.debug("Vehicle alert: %s", alert_name)
+            elif isinstance(payload, dict):
+                alert_name = payload.get("Name", "unknown")
+                _LOGGER.debug("Vehicle alert: %s", alert_name)
 
             # Could be used for notifications in the future
 
