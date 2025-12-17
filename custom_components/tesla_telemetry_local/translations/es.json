@@ -41,99 +41,12 @@
         "description": "Actualiza la configuración de la integración.\n\nVIN: {vehicle_vin}",
         "data": {
           "mqtt_topic_base": "Topic Base MQTT",
-          "vehicle_name": "Nombre del Vehículo",
-          "configure_telemetry": "Configurar Intervalos de Telemetría"
-        },
-        "data_description": {
-          "configure_telemetry": "Activa para configurar con qué frecuencia Tesla envía datos de telemetría"
+          "vehicle_name": "Nombre del Vehículo"
         }
-      },
-      "tesla_api": {
-        "title": "Conexión API Tesla",
-        "description": "Configura la conexión a la API Tesla Fleet vía proxy vehicle-command.\n\nEl proxy gestiona la autenticación y la firma de peticiones.",
-        "data": {
-          "proxy_url": "URL del Proxy",
-          "tesla_token": "Token OAuth Tesla"
-        },
-        "data_description": {
-          "proxy_url": "URL del proxy vehicle-command. Si HA corre en Docker, usa la IP del host (ej., https://192.168.x.x:4443), no localhost.",
-          "tesla_token": "Token de acceso OAuth de Tesla. Auto-detectado de la integración tesla_fleet si está disponible."
-        }
-      },
-      "preset_select": {
-        "title": "Preset de Telemetría",
-        "description": "Elige un preset de configuración de telemetría o personaliza los campos individualmente.\n\nLos presets optimizan la recolección de datos para casos de uso específicos.",
-        "data": {
-          "telemetry_preset": "Selecciona Preset"
-        },
-        "data_description": {
-          "telemetry_preset": "Elige un preset predefinido o personaliza"
-        }
-      },
-      "custom_fields": {
-        "title": "Campos de Telemetría Personalizados",
-        "description": "Configura los intervalos de cada campo. Pon 'Desactivado' para dejar de recibir ese campo.\n\nIntervalos más bajos = más consumo de datos.",
-        "data": {
-          "interval_Location": "Ubicación (GPS)",
-          "interval_VehicleSpeed": "Velocidad",
-          "interval_Gear": "Marchas (P/R/N/D)",
-          "interval_Odometer": "Kilometraje",
-          "interval_Soc": "Estado de Carga",
-          "interval_BatteryLevel": "Nivel de Batería",
-          "interval_EstBatteryRange": "Autonomía Estimada",
-          "interval_ChargeLimitSoc": "Límite de Carga",
-          "interval_ChargeState": "Estado de Carga",
-          "interval_DetailedChargeState": "Estado de Carga Detallado",
-          "interval_InsideTemp": "Temperatura Interior",
-          "interval_OutsideTemp": "Temperatura Exterior",
-          "interval_DoorState": "Estado de las Puertas",
-          "interval_Locked": "Estado del Bloqueo",
-          "interval_SentryMode": "Modo Centinela",
-          "interval_TpmsPressureFl": "Presión Rueda (Delantero Izq.)",
-          "interval_TpmsPressureFr": "Presión Rueda (Delantero Der.)",
-          "interval_TpmsPressureRl": "Presión Rueda (Trasero Izq.)",
-          "interval_TpmsPressureRr": "Presión Rueda (Trasero Der.)"
-        }
-      }
-    },
-    "error": {
-      "proxy_url_required": "La URL del proxy es obligatoria.",
-      "token_required": "El token OAuth de Tesla es obligatorio.",
-      "connection_failed": "No se ha podido conectar a la API Tesla. Comprueba la URL del proxy y el token.",
-      "apply_failed": "No se ha podido aplicar la configuración de telemetría a Tesla.",
-      "no_fields_selected": "Como mínimo un campo debe estar activado."
-    }
-  },
-  "selector": {
-    "preset_options": {
-      "options": {
-        "minimal": "Mínimo - Bajo consumo de datos",
-        "driving": "Conducción - Optimizado para viajes",
-        "charging": "Carga - Monitorizar sesiones",
-        "complete": "Completo - Todos los campos",
-        "custom": "Personalizado - Configura individualmente"
       }
     }
   },
   "entity": {
-    "button": {
-      "wake_up": { "name": "Despertar" },
-      "flash_lights": { "name": "Hacer Parpadear Luces" },
-      "honk_horn": { "name": "Tocar Claxon" },
-      "open_frunk": { "name": "Abrir Frunk" },
-      "open_trunk": { "name": "Abrir Maletero" },
-      "open_charge_port": { "name": "Abrir Puerto de Carga" },
-      "close_charge_port": { "name": "Cerrar Puerto de Carga" }
-    },
-    "switch": {
-      "sentry_mode": { "name": "Modo Centinela" },
-      "climate": { "name": "Climatización" },
-      "charging": { "name": "Carga" },
-      "locked": { "name": "Bloqueo" }
-    },
-    "number": {
-      "charge_limit": { "name": "Límite de Carga" }
-    },
     "binary_sensor": {
       "awake": { "name": "Despierto" },
       "driving": { "name": "Conduciendo" },
