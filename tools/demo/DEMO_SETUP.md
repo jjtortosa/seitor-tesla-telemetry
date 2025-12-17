@@ -169,8 +169,7 @@ Create a demo-specific dashboard showing:
 
 1. **Map card** with device_tracker
 2. **Gauge cards** for battery, speed
-3. **Entity cards** for all sensors
-4. **Button cards** for controls (disabled for demo)
+3. **Entity cards** for all sensors (read-only integration)
 
 Example Lovelace configuration:
 
@@ -245,16 +244,9 @@ Install HACS, then install `kiosk-mode`:
 # configuration.yaml
 kiosk_mode:
   non_admin_user: true
-  entity_settings:
-    - entity:
-        - switch.*
-        - button.*
-      hide: true
 ```
 
-### Option C: Guest Mode Dashboard
-
-Create a dashboard only with read-only cards (no controls).
+**Note:** The integration is read-only (sensors only), so no vehicle controls to hide.
 
 ## Verification
 

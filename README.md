@@ -53,9 +53,8 @@ This project provides a complete solution for streaming Tesla vehicle data to Ho
 - **Real-time streaming**: <1 second latency for location, shift state, speed, and more
 - **Self-hosted**: Full control over your data and infrastructure
 - **No monthly fees**: Free alternative to Teslemetry service
-- **Custom HA integration**: Native Home Assistant integration with device tracker, sensors, and controls
-- **Vehicle controls**: Lock, climate, charging, sentry mode, frunk/trunk, charge port
-- **Battery efficient**: No unnecessary vehicle wake-ups
+- **Custom HA integration**: Native Home Assistant integration with device tracker and sensors
+- **Battery efficient**: No unnecessary vehicle wake-ups (read-only, no controls)
 - **MQTT native**: Uses Home Assistant's built-in MQTT integration (v2.0+)
 - **JSON format**: Simple JSON messages, no Protobuf complexity
 - **Multi-language**: English, Spanish, and Catalan translations
@@ -83,16 +82,13 @@ Docker-based Fleet Telemetry server with MQTT output.
 ### 2. Home Assistant Integration (`custom_components/`)
 Custom component that subscribes to MQTT and creates HA entities.
 
-- **Entities created**: 31 entities per vehicle
+- **Entities created**: 19 entities per vehicle (read-only)
   - `device_tracker` (1): Real-time GPS location
   - `sensor` (14): Speed, shift state, battery, range, charging state, charger voltage/current, odometer, inside/outside temp, 4x tire pressure
   - `binary_sensor` (4): Awake, driving, charging, charge port open
-  - `button` (7): Wake up, flash lights, honk horn, open frunk/trunk, open/close charge port
-  - `switch` (4): Sentry mode, climate, charging, lock
-  - `number` (1): Charge limit (50-100%)
 - **Real-time updates**: Location, speed, battery, charging, TPMS, temperature
-- **Vehicle controls**: Lock, climate, charging, sentry mode via Tesla Fleet API
 - **No polling required**: Push-based updates via MQTT
+- **Read-only**: Sensors only, no vehicle controls (use Tesla app for controls)
 - **Dependency**: Requires MQTT integration configured in HA
 - **HACS compatible**: Easy installation via HACS custom repository
 
@@ -267,11 +263,11 @@ tesla/<VIN>/alerts/#            → Alert messages
         message: "Battery at {{ states('sensor.tesla_battery') }}%"
 ```
 
-### Pre-condition on Cold Mornings
+### Cold Morning Reminder
 
 ```yaml
-- id: 'tesla_precondition_cold'
-  alias: Tesla precondition when cold
+- id: 'tesla_cold_reminder'
+  alias: Tesla cold morning reminder
   triggers:
     - trigger: time
       at: '07:30:00'
@@ -283,13 +279,10 @@ tesla/<VIN>/alerts/#            → Alert messages
       entity_id: binary_sensor.workday_sensor
       state: 'on'
   actions:
-    - action: switch.turn_on
-      target:
-        entity_id: switch.tesla_climate
     - action: notify.mobile_app
       data:
         title: "Tesla"
-        message: "Pre-conditioning started ({{ states('sensor.tesla_outside_temp') }}°C outside)"
+        message: "It's {{ states('sensor.tesla_outside_temp') }}°C outside. Consider pre-conditioning your car via Tesla app."
 ```
 
 ### Charging Complete Alert
@@ -338,46 +331,29 @@ tesla/<VIN>/alerts/#            → Alert messages
         message: "Low tire pressure detected. Check tires."
 ```
 
-### Auto Lock When Leaving Home
+### Leaving Home Reminder
 
 ```yaml
-- id: 'tesla_auto_lock'
-  alias: Tesla auto lock when leaving
+- id: 'tesla_leaving_reminder'
+  alias: Tesla leaving home reminder
   triggers:
     - entity_id: device_tracker.tesla_YOUR_VIN
       zone: zone.home
       event: leave
       trigger: zone
   actions:
-    - action: switch.turn_on
-      target:
-        entity_id: switch.tesla_locked
-```
-
-### Sentry Mode at Night
-
-```yaml
-- id: 'tesla_sentry_night'
-  alias: Tesla sentry mode at night
-  triggers:
-    - trigger: time
-      at: '22:00:00'
-  conditions:
-    - condition: state
-      entity_id: device_tracker.tesla_YOUR_VIN
-      state: 'home'
-  actions:
-    - action: switch.turn_on
-      target:
-        entity_id: switch.tesla_sentry_mode
+    - action: notify.mobile_app
+      data:
+        title: "Tesla"
+        message: "You're leaving home. Battery at {{ states('sensor.tesla_battery') }}%"
 ```
 
 ## Cost Comparison
 
-| Solution | Monthly Cost | Latency | Setup Time | Control |
-|----------|--------------|---------|------------|---------|
-| **This project** | $0 (domain ~$1/mo) | <1s | 4-6h | Full |
-| Teslemetry | $5/month | <1s | 30min | Limited |
+| Solution | Monthly Cost | Latency | Setup Time | Controls |
+|----------|--------------|---------|------------|----------|
+| **This project** | $0 (domain ~$1/mo) | <1s | 4-6h | Read-only |
+| Teslemetry | $5/month | <1s | 30min | Full |
 | Tesla Fleet API polling | $0 | 2-15min | 2h | Full |
 
 ## Troubleshooting
@@ -429,14 +405,13 @@ MIT License - see [LICENSE](LICENSE) file
 
 ---
 
-**Status**: ✅ v2.2.0 - Production Ready
+**Status**: ✅ v2.3.0 - Production Ready (Read-Only)
 
 - ✅ Uses Home Assistant's native MQTT integration
 - ✅ Config Flow UI (no YAML required)
 - ✅ Real-world tested and working
 - ✅ JSON format (easy debugging)
 - ✅ device_tracker with zone triggers
-- ✅ 31 entities per vehicle (sensors, controls, buttons)
-- ✅ Vehicle controls via Tesla Fleet API (lock, climate, charging, sentry)
-- ✅ Telemetry configuration UI (presets + custom intervals)
+- ✅ 19 entities per vehicle (sensors only)
 - ✅ Multi-language support (EN, ES, CA)
+- ℹ️ Read-only integration (use Tesla app for vehicle controls)
