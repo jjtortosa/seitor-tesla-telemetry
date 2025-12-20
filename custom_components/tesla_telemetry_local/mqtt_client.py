@@ -1,6 +1,7 @@
 """MQTT client for Tesla Fleet Telemetry messages."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, Callable
@@ -27,6 +28,7 @@ class TeslaMQTTClient:
         self._callbacks: dict[str, list[Callable]] = {}
         self._unsubscribes: list[Callable] = []
         self._connected = False
+        self._subscriptions_ready: dict[str, bool] = {}
 
         _LOGGER.info(
             "Initialized TeslaMQTTClient: topic_base=%s, vin=%s",
@@ -53,6 +55,22 @@ class TeslaMQTTClient:
 
         # Subscribe to alerts: <topic_base>/<VIN>/alerts/#
         alerts_topic = f"{self._topic_base}/{self._vehicle_vin}/alerts/#"
+
+        # Track subscription readiness
+        self._subscriptions_ready = {
+            "metrics": False,
+            "connectivity": False,
+            "alerts": False,
+        }
+
+        def _make_status_callback(name: str) -> Callable[[], None]:
+            """Create a status callback for a subscription."""
+            def _on_subscribe_status() -> None:
+                self._subscriptions_ready[name] = True
+                _LOGGER.info("MQTT subscription ready: %s", name)
+                if all(self._subscriptions_ready.values()):
+                    _LOGGER.info("All MQTT subscriptions confirmed by broker")
+            return _on_subscribe_status
 
         try:
             # Subscribe to metrics (all vehicle data fields)
@@ -85,6 +103,35 @@ class TeslaMQTTClient:
             self._unsubscribes.append(unsub_alerts)
             _LOGGER.debug("Subscribed to MQTT topic: %s", alerts_topic)
 
+            # Use HA 2025.12 status callbacks to confirm subscriptions (non-blocking)
+            # This helps verify the broker has acknowledged our subscriptions
+            try:
+                await asyncio.gather(
+                    mqtt.async_on_subscribe_done(
+                        self._hass,
+                        metrics_topic,
+                        qos=1,
+                        on_subscribe_status=_make_status_callback("metrics"),
+                    ),
+                    mqtt.async_on_subscribe_done(
+                        self._hass,
+                        connectivity_topic,
+                        qos=1,
+                        on_subscribe_status=_make_status_callback("connectivity"),
+                    ),
+                    mqtt.async_on_subscribe_done(
+                        self._hass,
+                        alerts_topic,
+                        qos=1,
+                        on_subscribe_status=_make_status_callback("alerts"),
+                    ),
+                )
+            except AttributeError:
+                # Fallback for HA versions < 2025.12 without async_on_subscribe_done
+                _LOGGER.debug(
+                    "MQTT subscription status callbacks not available (HA < 2025.12)"
+                )
+
             self._connected = True
             _LOGGER.info("Tesla MQTT client started successfully")
 
@@ -103,6 +150,7 @@ class TeslaMQTTClient:
                 _LOGGER.error("Error unsubscribing from MQTT: %s", err)
 
         self._unsubscribes.clear()
+        self._subscriptions_ready.clear()
         self._connected = False
         _LOGGER.info("Tesla MQTT client stopped")
 
@@ -110,6 +158,11 @@ class TeslaMQTTClient:
     def connected(self) -> bool:
         """Return True if MQTT is connected."""
         return self._connected
+
+    @property
+    def subscriptions_confirmed(self) -> bool:
+        """Return True if all subscriptions are confirmed by broker."""
+        return all(self._subscriptions_ready.values()) if self._subscriptions_ready else False
 
     @callback
     def _handle_metrics_message(self, msg: mqtt.ReceiveMessage) -> None:
