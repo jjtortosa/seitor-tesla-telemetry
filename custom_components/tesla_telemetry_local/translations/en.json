@@ -51,7 +51,10 @@
       "awake": { "name": "Awake" },
       "driving": { "name": "Driving" },
       "charging": { "name": "Charging" },
-      "charge_port_open": { "name": "Charge Port" }
+      "charge_port_open": { "name": "Charge Port" },
+      "locked": { "name": "Locked" },
+      "sentry_mode": { "name": "Sentry Mode" },
+      "doors_open": { "name": "Doors" }
     },
     "sensor": {
       "speed": { "name": "Speed" },

@@ -1,0 +1,76 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurazione MQTT",
+        "description": "Configura il topic MQTT per Tesla Fleet Telemetry.\n\nNota: Questa integrazione richiede che MQTT sia configurato in Home Assistant e un server Tesla Fleet Telemetry self-hosted che pubblica su MQTT.",
+        "data": {
+          "mqtt_topic_base": "Topic Base MQTT"
+        },
+        "data_description": {
+          "mqtt_topic_base": "Topic base utilizzato da Fleet Telemetry (es., 'tesla'). I messaggi saranno ricevuti da tesla/VIN/v/#"
+        }
+      },
+      "vehicle": {
+        "title": "Configurazione Veicolo",
+        "description": "Configura il tuo veicolo Tesla.",
+        "data": {
+          "vehicle_vin": "VIN del Veicolo",
+          "vehicle_name": "Nome del Veicolo"
+        },
+        "data_description": {
+          "vehicle_vin": "Numero di Identificazione del Veicolo di 17 caratteri",
+          "vehicle_name": "Nome descrittivo per il tuo veicolo"
+        }
+      }
+    },
+    "error": {
+      "vin_required": "Il VIN è obbligatorio.",
+      "vin_invalid_length": "Il VIN deve avere esattamente 17 caratteri.",
+      "vin_invalid_format": "Il VIN contiene caratteri non validi. Sono ammesse solo lettere (eccetto I, O, Q) e numeri."
+    },
+    "abort": {
+      "already_configured": "Questo veicolo è già configurato.",
+      "mqtt_not_configured": "MQTT non è configurato in Home Assistant. Per favore configura prima MQTT."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opzioni Tesla Fleet Telemetry",
+        "description": "Aggiorna le impostazioni dell'integrazione.\n\nVIN: {vehicle_vin}",
+        "data": {
+          "mqtt_topic_base": "Topic Base MQTT",
+          "vehicle_name": "Nome del Veicolo"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "awake": { "name": "Sveglio" },
+      "driving": { "name": "In Marcia" },
+      "charging": { "name": "In Carica" },
+      "charge_port_open": { "name": "Porta di Ricarica" },
+      "locked": { "name": "Bloccato" },
+      "sentry_mode": { "name": "Modalità Sentinella" },
+      "doors_open": { "name": "Porte" }
+    },
+    "sensor": {
+      "speed": { "name": "Velocità" },
+      "shift_state": { "name": "Marcia" },
+      "battery": { "name": "Batteria" },
+      "range": { "name": "Autonomia" },
+      "charging_state": { "name": "Stato di Carica" },
+      "charger_voltage": { "name": "Tensione Caricatore" },
+      "charger_current": { "name": "Corrente Caricatore" },
+      "odometer": { "name": "Contachilometri" },
+      "inside_temp": { "name": "Temperatura Interna" },
+      "outside_temp": { "name": "Temperatura Esterna" },
+      "tpms_front_left": { "name": "Pressione Pneumatico Anteriore Sinistro" },
+      "tpms_front_right": { "name": "Pressione Pneumatico Anteriore Destro" },
+      "tpms_rear_left": { "name": "Pressione Pneumatico Posteriore Sinistro" },
+      "tpms_rear_right": { "name": "Pressione Pneumatico Posteriore Destro" }
+    }
+  }
+}

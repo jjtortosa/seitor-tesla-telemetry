@@ -1,5 +1,10 @@
 # Tesla Fleet Telemetry Self-Hosted
 
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![GitHub Release](https://img.shields.io/github/v/release/jjtortosa/seitor-tesla-telemetry)](https://github.com/jjtortosa/seitor-tesla-telemetry/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1+-blue.svg)](https://www.home-assistant.io/)
+
 Self-hosted Tesla Fleet Telemetry server with custom Home Assistant integration for real-time vehicle data streaming.
 
 ---
@@ -57,7 +62,7 @@ This project provides a complete solution for streaming Tesla vehicle data to Ho
 - **Battery efficient**: No unnecessary vehicle wake-ups (read-only, no controls)
 - **MQTT native**: Uses Home Assistant's built-in MQTT integration (v2.0+)
 - **JSON format**: Simple JSON messages, no Protobuf complexity
-- **Multi-language**: English, Spanish, and Catalan translations
+- **Multi-language**: English, Spanish, Catalan, French, German, Italian, Portuguese
 
 ### Architecture
 
@@ -82,10 +87,10 @@ Docker-based Fleet Telemetry server with MQTT output.
 ### 2. Home Assistant Integration (`custom_components/`)
 Custom component that subscribes to MQTT and creates HA entities.
 
-- **Entities created**: 19 entities per vehicle (read-only)
+- **Entities created**: 22 entities per vehicle (read-only)
   - `device_tracker` (1): Real-time GPS location
   - `sensor` (14): Speed, shift state, battery, range, charging state, charger voltage/current, odometer, inside/outside temp, 4x tire pressure
-  - `binary_sensor` (4): Awake, driving, charging, charge port open
+  - `binary_sensor` (7): Awake, driving, charging, charge port, locked, sentry mode, doors
 - **Real-time updates**: Location, speed, battery, charging, TPMS, temperature
 - **No polling required**: Push-based updates via MQTT
 - **Read-only**: Sensors only, no vehicle controls (use Tesla app for controls)
@@ -138,9 +143,31 @@ Complete setup guides from infrastructure to automation examples.
 4. **HA Integration**
    - Install Mosquitto add-on in Home Assistant
    - Configure MQTT integration
-   - Copy `custom_components/tesla_telemetry_local/` to HA
+   - Install via HACS or manually (see below)
    - Add integration via UI: **Settings → Devices & Services → Add Integration**
    - Search for "Tesla Fleet Telemetry Local"
+
+## Installation
+
+### Option A: HACS (Recommended)
+
+1. Open HACS in Home Assistant
+2. Click the three dots menu → **Custom repositories**
+3. Add repository: `https://github.com/jjtortosa/seitor-tesla-telemetry`
+4. Select category: **Integration**
+5. Click **Add**
+6. Search for "Tesla Fleet Telemetry Local" and install
+7. Restart Home Assistant
+8. Go to **Settings → Devices & Services → Add Integration**
+9. Search for "Tesla Fleet Telemetry Local"
+
+### Option B: Manual Installation
+
+1. Download the latest release from [GitHub](https://github.com/jjtortosa/seitor-tesla-telemetry/releases)
+2. Copy `custom_components/tesla_telemetry_local/` to your HA `config/custom_components/`
+3. Restart Home Assistant
+4. Go to **Settings → Devices & Services → Add Integration**
+5. Search for "Tesla Fleet Telemetry Local"
 
 ## Configuration
 
@@ -405,13 +432,14 @@ MIT License - see [LICENSE](LICENSE) file
 
 ---
 
-**Status**: ✅ v2.3.0 - Production Ready (Read-Only)
+**Status**: ✅ v2.4.0 - Production Ready (Read-Only)
 
 - ✅ Uses Home Assistant's native MQTT integration
 - ✅ Config Flow UI (no YAML required)
 - ✅ Real-world tested and working
 - ✅ JSON format (easy debugging)
 - ✅ device_tracker with zone triggers
-- ✅ 19 entities per vehicle (sensors only)
-- ✅ Multi-language support (EN, ES, CA)
+- ✅ 22 entities per vehicle (sensors only)
+- ✅ Multi-language support (EN, ES, CA, FR, DE, IT, PT)
+- ✅ HACS compatible (custom repository)
 - ℹ️ Read-only integration (use Tesla app for vehicle controls)

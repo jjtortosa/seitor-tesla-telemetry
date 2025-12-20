@@ -27,6 +27,9 @@ BINARY_SENSOR_DEFINITIONS: list[tuple[str, str, BinarySensorDeviceClass, str, st
     ("driving", "Driving", BinarySensorDeviceClass.MOVING, "mdi:car-speed-limiter", "mdi:car-parking", ["Gear", "VehicleSpeed"]),
     ("charging", "Charging", BinarySensorDeviceClass.BATTERY_CHARGING, "mdi:battery-charging", "mdi:battery", ["ChargingState", "ChargeState"]),
     ("charge_port_open", "Charge Port", BinarySensorDeviceClass.DOOR, "mdi:ev-plug-type2", "mdi:ev-plug-type2", ["ChargePortDoorOpen"]),
+    ("locked", "Locked", BinarySensorDeviceClass.LOCK, "mdi:car-key", "mdi:car-key", ["Locked"]),
+    ("sentry_mode", "Sentry Mode", None, "mdi:cctv", "mdi:cctv-off", ["SentryMode"]),
+    ("doors_open", "Doors", BinarySensorDeviceClass.DOOR, "mdi:car-door", "mdi:car-door", ["DoorState"]),
     ("awake", "Awake", BinarySensorDeviceClass.CONNECTIVITY, "mdi:sleep-off", "mdi:sleep", []),
 ]
 
@@ -172,6 +175,15 @@ class TeslaBinarySensor(BinarySensorEntity):
             elif self._sensor_key == "charge_port_open":
                 self._state = self._calculate_charge_port_state()
 
+            elif self._sensor_key == "locked":
+                self._state = self._calculate_locked_state()
+
+            elif self._sensor_key == "sentry_mode":
+                self._state = self._calculate_sentry_mode_state()
+
+            elif self._sensor_key == "doors_open":
+                self._state = self._calculate_doors_state()
+
             elif self._sensor_key == "awake":
                 # If we receive any data, vehicle is awake
                 self._state = True
@@ -252,6 +264,43 @@ class TeslaBinarySensor(BinarySensorEntity):
 
         return bool(charge_port_open)
 
+    def _calculate_locked_state(self) -> bool:
+        """Calculate if vehicle is locked."""
+        locked = self._data_cache.get("Locked", False)
+
+        if isinstance(locked, bool):
+            return locked
+
+        if isinstance(locked, str):
+            return locked.lower() in ["true", "1", "locked"]
+
+        return bool(locked)
+
+    def _calculate_sentry_mode_state(self) -> bool:
+        """Calculate if sentry mode is active."""
+        sentry = self._data_cache.get("SentryMode", False)
+
+        if isinstance(sentry, bool):
+            return sentry
+
+        if isinstance(sentry, str):
+            return sentry.lower() in ["true", "1", "on", "active"]
+
+        return bool(sentry)
+
+    def _calculate_doors_state(self) -> bool:
+        """Calculate if any door is open."""
+        door_state = self._data_cache.get("DoorState", "closed")
+
+        if isinstance(door_state, str):
+            # Door is open if state is anything other than "closed"
+            return door_state.lower() != "closed"
+
+        if isinstance(door_state, bool):
+            return door_state
+
+        return bool(door_state)
+
     def _get_detection_method(self) -> str:
         """Get human-readable detection method."""
         if self._sensor_key == "driving":
@@ -275,6 +324,18 @@ class TeslaBinarySensor(BinarySensorEntity):
 
         elif self._sensor_key == "charge_port_open":
             return "Port door sensor"
+
+        elif self._sensor_key == "locked":
+            locked = self._data_cache.get("Locked")
+            return f"Locked: {locked}" if locked is not None else "Unknown"
+
+        elif self._sensor_key == "sentry_mode":
+            sentry = self._data_cache.get("SentryMode")
+            return f"Sentry: {sentry}" if sentry is not None else "Unknown"
+
+        elif self._sensor_key == "doors_open":
+            door_state = self._data_cache.get("DoorState", "Unknown")
+            return f"Door state: {door_state}"
 
         elif self._sensor_key == "awake":
             if self._last_message_time:

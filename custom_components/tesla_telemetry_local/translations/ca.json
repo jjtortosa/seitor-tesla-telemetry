@@ -51,7 +51,10 @@
       "awake": { "name": "Despert" },
       "driving": { "name": "Conduint" },
       "charging": { "name": "Carregant" },
-      "charge_port_open": { "name": "Port de Càrrega" }
+      "charge_port_open": { "name": "Port de Càrrega" },
+      "locked": { "name": "Tancat" },
+      "sentry_mode": { "name": "Mode Sentinella" },
+      "doors_open": { "name": "Portes" }
     },
     "sensor": {
       "speed": { "name": "Velocitat" },

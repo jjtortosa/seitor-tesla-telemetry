@@ -51,7 +51,10 @@
       "awake": { "name": "Despierto" },
       "driving": { "name": "Conduciendo" },
       "charging": { "name": "Cargando" },
-      "charge_port_open": { "name": "Puerto de Carga" }
+      "charge_port_open": { "name": "Puerto de Carga" },
+      "locked": { "name": "Bloqueado" },
+      "sentry_mode": { "name": "Modo Centinela" },
+      "doors_open": { "name": "Puertas" }
     },
     "sensor": {
       "speed": { "name": "Velocidad" },
