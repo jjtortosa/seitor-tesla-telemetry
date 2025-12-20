@@ -151,15 +151,17 @@ Complete setup guides from infrastructure to automation examples.
 
 ### Option A: HACS (Recommended)
 
-1. Open HACS in Home Assistant
-2. Click the three dots menu → **Custom repositories**
-3. Add repository: `https://github.com/jjtortosa/seitor-tesla-telemetry`
-4. Select category: **Integration**
-5. Click **Add**
-6. Search for "Tesla Fleet Telemetry Local" and install
-7. Restart Home Assistant
-8. Go to **Settings → Devices & Services → Add Integration**
-9. Search for "Tesla Fleet Telemetry Local"
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jjtortosa&repository=seitor-tesla-telemetry&category=integration)
+
+1. Click the button above, or manually:
+   - Open HACS in Home Assistant
+   - Click the three dots menu → **Custom repositories**
+   - Add repository: `https://github.com/jjtortosa/seitor-tesla-telemetry`
+   - Select category: **Integration**
+2. Search for "Tesla Fleet Telemetry Local" and install
+3. Restart Home Assistant
+4. Go to **Settings → Devices & Services → Add Integration**
+5. Search for "Tesla Fleet Telemetry Local"
 
 ### Option B: Manual Installation
 
