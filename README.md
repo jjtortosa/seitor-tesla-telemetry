@@ -87,10 +87,10 @@ Docker-based Fleet Telemetry server with MQTT output.
 ### 2. Home Assistant Integration (`custom_components/`)
 Custom component that subscribes to MQTT and creates HA entities.
 
-- **Entities created**: 22 entities per vehicle (read-only)
+- **Entities created**: 25 entities per vehicle (read-only)
   - `device_tracker` (1): Real-time GPS location
   - `sensor` (14): Speed, shift state, battery, range, charging state, charger voltage/current, odometer, inside/outside temp, 4x tire pressure
-  - `binary_sensor` (7): Awake, driving, charging, charge port, locked, sentry mode, doors
+  - `binary_sensor` (10): Awake, driving, charging, charge port, locked, sentry mode, doors, driver present, driver seatbelt, passenger seatbelt
 - **Real-time updates**: Location, speed, battery, charging, TPMS, temperature
 - **No polling required**: Push-based updates via MQTT
 - **Read-only**: Sensors only, no vehicle controls (use Tesla app for controls)
@@ -110,6 +110,7 @@ Complete setup guides from infrastructure to automation examples.
 | **TPMS** | TpmsPressureFl, TpmsPressureFr, TpmsPressureRl, TpmsPressureRr |
 | **Climate** | InsideTemp, OutsideTemp |
 | **Security** | DoorState, SentryMode, Locked |
+| **Occupancy** | DriverSeatOccupied, DriverSeatBelt, PassengerSeatBelt |
 | **Other** | Odometer |
 
 ## Quick Start
@@ -377,6 +378,42 @@ tesla/<VIN>/alerts/#            → Alert messages
         message: "You're leaving home. Battery at {{ states('sensor.tesla_battery') }}%"
 ```
 
+### Driver Detection Notification
+
+```yaml
+- id: 'tesla_driver_entered'
+  alias: Tesla driver entered
+  triggers:
+    - entity_id: binary_sensor.tesla_driver_present
+      to: 'on'
+      trigger: state
+  actions:
+    - action: notify.mobile_app
+      data:
+        title: "Tesla"
+        message: "Someone entered the car"
+```
+
+### Seatbelt Reminder While Driving
+
+```yaml
+- id: 'tesla_seatbelt_reminder'
+  alias: Tesla seatbelt reminder
+  triggers:
+    - entity_id: binary_sensor.tesla_driving
+      to: 'on'
+      trigger: state
+  conditions:
+    - condition: state
+      entity_id: binary_sensor.tesla_driver_seatbelt
+      state: 'off'
+  actions:
+    - action: notify.mobile_app
+      data:
+        title: "⚠️ Seatbelt"
+        message: "Driver seatbelt not fastened!"
+```
+
 ## Cost Comparison
 
 | Solution | Monthly Cost | Latency | Setup Time | Controls |
@@ -441,7 +478,7 @@ MIT License - see [LICENSE](LICENSE) file
 - ✅ Real-world tested and working
 - ✅ JSON format (easy debugging)
 - ✅ device_tracker with zone triggers
-- ✅ 22 entities per vehicle (sensors only)
+- ✅ 25 entities per vehicle (sensors only)
 - ✅ Multi-language support (EN, ES, CA, FR, DE, IT, PT)
 - ✅ HACS compatible (custom repository)
 - ℹ️ Read-only integration (use Tesla app for vehicle controls)

@@ -54,7 +54,10 @@
       "charge_port_open": { "name": "Charge Port" },
       "locked": { "name": "Locked" },
       "sentry_mode": { "name": "Sentry Mode" },
-      "doors_open": { "name": "Doors" }
+      "doors_open": { "name": "Doors" },
+      "driver_present": { "name": "Driver Present" },
+      "driver_seatbelt": { "name": "Driver Seatbelt" },
+      "passenger_seatbelt": { "name": "Passenger Seatbelt" }
     },
     "sensor": {
       "speed": { "name": "Speed" },

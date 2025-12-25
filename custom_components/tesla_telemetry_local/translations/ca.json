@@ -54,7 +54,10 @@
       "charge_port_open": { "name": "Port de Càrrega" },
       "locked": { "name": "Tancat" },
       "sentry_mode": { "name": "Mode Sentinella" },
-      "doors_open": { "name": "Portes" }
+      "doors_open": { "name": "Portes" },
+      "driver_present": { "name": "Conductor Present" },
+      "driver_seatbelt": { "name": "Cinturó Conductor" },
+      "passenger_seatbelt": { "name": "Cinturó Passatger" }
     },
     "sensor": {
       "speed": { "name": "Velocitat" },

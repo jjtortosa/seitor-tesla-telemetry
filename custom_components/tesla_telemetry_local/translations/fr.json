@@ -54,7 +54,10 @@
       "charge_port_open": { "name": "Port de Charge" },
       "locked": { "name": "Verrouillé" },
       "sentry_mode": { "name": "Mode Sentinelle" },
-      "doors_open": { "name": "Portes" }
+      "doors_open": { "name": "Portes" },
+      "driver_present": { "name": "Conducteur Présent" },
+      "driver_seatbelt": { "name": "Ceinture Conducteur" },
+      "passenger_seatbelt": { "name": "Ceinture Passager" }
     },
     "sensor": {
       "speed": { "name": "Vitesse" },

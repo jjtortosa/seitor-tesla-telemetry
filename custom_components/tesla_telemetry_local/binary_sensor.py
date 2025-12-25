@@ -31,6 +31,10 @@ BINARY_SENSOR_DEFINITIONS: list[tuple[str, str, BinarySensorDeviceClass, str, st
     ("sentry_mode", "Sentry Mode", None, "mdi:cctv", "mdi:cctv-off", ["SentryMode"]),
     ("doors_open", "Doors", BinarySensorDeviceClass.DOOR, "mdi:car-door", "mdi:car-door", ["DoorState"]),
     ("awake", "Awake", BinarySensorDeviceClass.CONNECTIVITY, "mdi:sleep-off", "mdi:sleep", []),
+    # Occupancy sensors
+    ("driver_present", "Driver Present", BinarySensorDeviceClass.OCCUPANCY, "mdi:car-seat", "mdi:car-seat", ["DriverSeatOccupied"]),
+    ("driver_seatbelt", "Driver Seatbelt", None, "mdi:seatbelt", "mdi:seatbelt", ["DriverSeatBelt"]),
+    ("passenger_seatbelt", "Passenger Seatbelt", None, "mdi:seatbelt", "mdi:seatbelt", ["PassengerSeatBelt"]),
 ]
 
 
@@ -189,6 +193,15 @@ class TeslaBinarySensor(BinarySensorEntity):
                 self._state = True
                 self._last_message_time = datetime.now()
 
+            elif self._sensor_key == "driver_present":
+                self._state = self._calculate_driver_present_state()
+
+            elif self._sensor_key == "driver_seatbelt":
+                self._state = self._calculate_seatbelt_state("DriverSeatBelt")
+
+            elif self._sensor_key == "passenger_seatbelt":
+                self._state = self._calculate_seatbelt_state("PassengerSeatBelt")
+
             self._last_updated = data.get("timestamp")
 
             _LOGGER.debug(
@@ -301,6 +314,30 @@ class TeslaBinarySensor(BinarySensorEntity):
 
         return bool(door_state)
 
+    def _calculate_driver_present_state(self) -> bool:
+        """Calculate if driver is present in the vehicle."""
+        occupied = self._data_cache.get("DriverSeatOccupied", False)
+
+        if isinstance(occupied, bool):
+            return occupied
+
+        if isinstance(occupied, str):
+            return occupied.lower() in ["true", "1", "yes", "occupied"]
+
+        return bool(occupied)
+
+    def _calculate_seatbelt_state(self, field: str) -> bool:
+        """Calculate if seatbelt is buckled."""
+        buckled = self._data_cache.get(field, False)
+
+        if isinstance(buckled, bool):
+            return buckled
+
+        if isinstance(buckled, str):
+            return buckled.lower() in ["true", "1", "buckled", "fastened"]
+
+        return bool(buckled)
+
     def _get_detection_method(self) -> str:
         """Get human-readable detection method."""
         if self._sensor_key == "driving":
@@ -341,6 +378,18 @@ class TeslaBinarySensor(BinarySensorEntity):
             if self._last_message_time:
                 return f"Last data: {self._last_message_time.strftime('%H:%M:%S')}"
             return "No data received"
+
+        elif self._sensor_key == "driver_present":
+            occupied = self._data_cache.get("DriverSeatOccupied")
+            return f"Seat occupied: {occupied}" if occupied is not None else "Unknown"
+
+        elif self._sensor_key == "driver_seatbelt":
+            buckled = self._data_cache.get("DriverSeatBelt")
+            return f"Buckled: {buckled}" if buckled is not None else "Unknown"
+
+        elif self._sensor_key == "passenger_seatbelt":
+            buckled = self._data_cache.get("PassengerSeatBelt")
+            return f"Buckled: {buckled}" if buckled is not None else "Unknown"
 
         return "Unknown"
 

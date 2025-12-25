@@ -54,7 +54,10 @@
       "charge_port_open": { "name": "Ladeanschluss" },
       "locked": { "name": "Verriegelt" },
       "sentry_mode": { "name": "Wächtermodus" },
-      "doors_open": { "name": "Türen" }
+      "doors_open": { "name": "Türen" },
+      "driver_present": { "name": "Fahrer Anwesend" },
+      "driver_seatbelt": { "name": "Sicherheitsgurt Fahrer" },
+      "passenger_seatbelt": { "name": "Sicherheitsgurt Beifahrer" }
     },
     "sensor": {
       "speed": { "name": "Geschwindigkeit" },

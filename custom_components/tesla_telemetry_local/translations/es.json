@@ -54,7 +54,10 @@
       "charge_port_open": { "name": "Puerto de Carga" },
       "locked": { "name": "Bloqueado" },
       "sentry_mode": { "name": "Modo Centinela" },
-      "doors_open": { "name": "Puertas" }
+      "doors_open": { "name": "Puertas" },
+      "driver_present": { "name": "Conductor Presente" },
+      "driver_seatbelt": { "name": "Cinturón Conductor" },
+      "passenger_seatbelt": { "name": "Cinturón Pasajero" }
     },
     "sensor": {
       "speed": { "name": "Velocidad" },
