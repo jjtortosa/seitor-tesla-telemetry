@@ -61,6 +61,11 @@ class VehicleState:
     doors_open: bool = False
     charge_port_open: bool = False
 
+    # Occupancy
+    driver_present: bool = False
+    driver_seatbelt: bool = False
+    passenger_seatbelt: bool = False
+
 
 class TelemetrySimulator:
     """Simulates Tesla telemetry data and publishes to MQTT."""
@@ -175,6 +180,11 @@ class TelemetrySimulator:
         self._publish("DoorState", "closed" if not s.doors_open else "open")
         self._publish("ChargePortDoorOpen", s.charge_port_open)
 
+        # Occupancy
+        self._publish("DriverSeatOccupied", s.driver_present)
+        self._publish("DriverSeatBelt", s.driver_seatbelt)
+        self._publish("PassengerSeatBelt", s.passenger_seatbelt)
+
         # Connectivity
         self._publish_connectivity("connected")
 
@@ -184,6 +194,9 @@ class TelemetrySimulator:
         self.state.speed = 0
         self.state.gear = "P"
         self.state.locked = True
+        self.state.driver_present = False
+        self.state.driver_seatbelt = False
+        self.state.passenger_seatbelt = False
 
         elapsed = 0
         while elapsed < duration:
@@ -209,6 +222,9 @@ class TelemetrySimulator:
         self.state.gear = "D"
         self.state.locked = True
         self.state.sentry_mode = False
+        self.state.driver_present = True
+        self.state.driver_seatbelt = True
+        self.state.passenger_seatbelt = random.choice([True, False])  # Maybe passenger
 
         # Barcelona route simulation
         route_points = [
@@ -273,6 +289,9 @@ class TelemetrySimulator:
         self.state.charge_port_open = True
         self.state.charger_voltage = 230.0
         self.state.charger_current = 16.0
+        self.state.driver_present = False
+        self.state.driver_seatbelt = False
+        self.state.passenger_seatbelt = False
 
         elapsed = 0
         while elapsed < duration and self.state.battery_level < self.state.charge_limit:
@@ -313,6 +332,9 @@ class TelemetrySimulator:
         self.state.longitude = home_lon + 0.02
         self.state.speed = 50
         self.state.gear = "D"
+        self.state.driver_present = True
+        self.state.driver_seatbelt = True
+        self.state.passenger_seatbelt = False
 
         elapsed = 0
         while elapsed < duration:
@@ -346,26 +368,54 @@ class TelemetrySimulator:
         """Simulate a complete trip: leave home, drive, arrive destination."""
         print("🗺️ Scenario: COMPLETE TRIP")
 
-        # Phase 1: Leave home
-        print("\n--- Phase 1: Leaving home ---")
+        # Phase 1: Driver enters vehicle
+        print("\n--- Phase 1: Driver entering vehicle ---")
         self.state.sentry_mode = False
         self.state.locked = False
+        self.state.doors_open = True
+        self.state.driver_present = True
+        self.state.driver_seatbelt = False
+        self.publish_full_state()
+        print("  🚪 Door opened, driver seated")
         time.sleep(2)
+
+        # Phase 2: Buckle up and start
+        print("\n--- Phase 2: Starting drive ---")
+        self.state.doors_open = False
+        self.state.driver_seatbelt = True
+        self.state.locked = True
         self.state.gear = "D"
         self.publish_full_state()
+        print("  🔒 Door closed, seatbelt fastened, driving")
+        time.sleep(1)
 
-        # Phase 2: Drive
-        print("\n--- Phase 2: Driving ---")
+        # Phase 3: Drive
+        print("\n--- Phase 3: Driving ---")
         self._scenario_driving(duration // 2, interval)
 
-        # Phase 3: Arrive and park
-        print("\n--- Phase 3: Arriving at destination ---")
+        # Phase 4: Arrive and exit
+        print("\n--- Phase 4: Arriving at destination ---")
         self.state.speed = 0
         self.state.gear = "P"
+        self.state.driver_seatbelt = False
+        self.publish_full_state()
+        print("  🅿️ Parked, seatbelt off")
+        time.sleep(2)
+
+        # Phase 5: Driver exits
+        print("\n--- Phase 5: Driver exiting ---")
+        self.state.doors_open = True
+        self.state.driver_present = False
+        self.publish_full_state()
+        print("  🚪 Door opened, driver exiting")
+        time.sleep(2)
+
+        # Phase 6: Lock and secure
+        self.state.doors_open = False
         self.state.locked = True
         self.state.sentry_mode = True
         self.publish_full_state()
-        print("  ✅ Trip complete! Vehicle parked and secured.")
+        print("  ✅ Trip complete! Vehicle locked and secured.")
 
     def run_scenario(self, scenario: str, duration: int = 60, interval: float = 5.0):
         """Run a simulation scenario."""
