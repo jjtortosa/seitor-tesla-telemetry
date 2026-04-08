@@ -126,10 +126,11 @@ class TeslaMQTTClient:
                         on_subscribe_status=_make_status_callback("alerts"),
                     ),
                 )
-            except AttributeError:
-                # Fallback for HA versions < 2025.12 without async_on_subscribe_done
+            except Exception:
+                # Fallback for HA versions where async_on_subscribe_done is missing
+                # or returns a non-awaitable (HA 2026.3+)
                 _LOGGER.debug(
-                    "MQTT subscription status callbacks not available (HA < 2025.12)"
+                    "MQTT subscription status callbacks not available"
                 )
 
             self._connected = True
