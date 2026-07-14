@@ -35,7 +35,7 @@ SENSOR_DEFINITIONS: list[tuple[str, str, str, str | None, SensorDeviceClass | No
     ("shift_state", "Shift State", "Gear", None, None, "mdi:car-shift-pattern", None),
     ("battery", "Battery", "Soc", PERCENTAGE, SensorDeviceClass.BATTERY, None, SensorStateClass.MEASUREMENT),
     ("range", "Range", "EstBatteryRange", UnitOfLength.KILOMETERS, None, "mdi:map-marker-distance", SensorStateClass.MEASUREMENT),
-    ("charging_state", "Charging State", "ChargeState", None, None, "mdi:ev-station", None),
+    ("charging_state", "Charging State", "DetailedChargeState", None, None, "mdi:ev-station", None),
     ("charger_voltage", "Charger Voltage", "ChargerVoltage", UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, None, SensorStateClass.MEASUREMENT),
     ("charger_current", "Charger Current", "ChargerActualCurrent", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT, None, SensorStateClass.MEASUREMENT),
     ("odometer", "Odometer", "Odometer", UnitOfLength.KILOMETERS, None, "mdi:counter", SensorStateClass.TOTAL_INCREASING),
@@ -162,8 +162,13 @@ class TeslaSensor(SensorEntity):
             elif self._field_name == "EstBatteryRange":
                 self._state = round(float(value), 1) if value is not None else None
 
-            elif self._field_name == "ChargeState":
-                self._state = str(value).capitalize() if value else "Disconnected"
+            elif self._field_name == "DetailedChargeState":
+                # Tesla sends the detailed charge state prefixed, e.g.
+                # "DetailedChargeStateStopped" -> "Stopped", "DetailedChargeStateCharging" -> "Charging".
+                # (The old "ChargeState" field is deprecated and streamed internal
+                # charger-controller states like "Idle"/"Startup"/"ClearFaults".)
+                raw = str(value) if value else "DetailedChargeStateDisconnected"
+                self._state = raw.replace("DetailedChargeState", "") or "Unknown"
 
             elif self._field_name in ["ChargerVoltage", "ChargerActualCurrent"]:
                 self._state = round(float(value), 1) if value is not None else 0

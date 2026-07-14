@@ -25,7 +25,7 @@ AWAKE_TIMEOUT_MINUTES = 5
 # Binary sensor definitions: (key, name, device_class, icon_on, icon_off, depends_on)
 BINARY_SENSOR_DEFINITIONS: list[tuple[str, str, BinarySensorDeviceClass, str, str, list[str]]] = [
     ("driving", "Driving", BinarySensorDeviceClass.MOVING, "mdi:car-speed-limiter", "mdi:car-parking", ["Gear", "VehicleSpeed"]),
-    ("charging", "Charging", BinarySensorDeviceClass.BATTERY_CHARGING, "mdi:battery-charging", "mdi:battery", ["ChargingState", "ChargeState"]),
+    ("charging", "Charging", BinarySensorDeviceClass.BATTERY_CHARGING, "mdi:battery-charging", "mdi:battery", ["DetailedChargeState"]),
     ("charge_port_open", "Charge Port", BinarySensorDeviceClass.DOOR, "mdi:ev-plug-type2", "mdi:ev-plug-type2", ["ChargePortDoorOpen"]),
     ("locked", "Locked", BinarySensorDeviceClass.LOCK, "mdi:car-key", "mdi:car-key", ["Locked"]),
     ("sentry_mode", "Sentry Mode", None, "mdi:cctv", "mdi:cctv-off", ["SentryMode"]),
@@ -258,11 +258,10 @@ class TeslaBinarySensor(BinarySensorEntity):
 
     def _calculate_charging_state(self) -> bool:
         """Calculate if vehicle is charging."""
-        # Check both possible field names
-        for field in ["ChargingState", "ChargeState"]:
-            state = self._data_cache.get(field, "")
-            if isinstance(state, str) and state.lower() == "charging":
-                return True
+        # DetailedChargeState arrives prefixed, e.g. "DetailedChargeStateCharging".
+        state = self._data_cache.get("DetailedChargeState", "")
+        if isinstance(state, str) and state.lower() == "detailedchargestatecharging":
+            return True
         return False
 
     def _calculate_charge_port_state(self) -> bool:
@@ -353,10 +352,9 @@ class TeslaBinarySensor(BinarySensorEntity):
             return "Parked"
 
         elif self._sensor_key == "charging":
-            for field in ["ChargingState", "ChargeState"]:
-                state = self._data_cache.get(field)
-                if state:
-                    return f"State: {state}"
+            state = self._data_cache.get("DetailedChargeState")
+            if state:
+                return f"State: {str(state).replace('DetailedChargeState', '')}"
             return "Unknown"
 
         elif self._sensor_key == "charge_port_open":
